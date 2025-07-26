@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, Modal, Platform, Pressable } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, Image, Modal, Pressable } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { Room } from '@/types';
-import { router } from 'expo-router';
-import { Calendar, Users, Search as SearchIcon } from 'lucide-react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Calendar as CalendarIcon, Users, Search as SearchIcon } from 'lucide-react-native';
+import { Calendar, DateData } from 'react-native-calendars';
 
 const { width } = Dimensions.get('window');
 
 export default function SearchScreen() {
-    const [checkInDate, setCheckInDate] = useState(new Date());
-    const [checkOutDate, setCheckOutDate] = useState(new Date(Date.now() + 86400000));
+    const [checkInDate, setCheckInDate] = useState<Date | null>(new Date());
+    const [checkOutDate, setCheckOutDate] = useState<Date | null>(new Date(Date.now() + 86400000));
+    const [isCalendarVisible, setCalendarVisible] = useState(false);
+    const [selectionStep, setSelectionStep] = useState<'checkIn' | 'checkOut'>('checkIn');
+
     const [guestCount, setGuestCount] = useState(2);
     const [rooms, setRooms] = useState<Room[]>([]);
     const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
@@ -18,13 +21,12 @@ export default function SearchScreen() {
     const [searchPerformed, setSearchPerformed] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
 
-    // Состояния для управления календарем
-    const [isPickerVisible, setPickerVisible] = useState(false);
-    const [pickerType, setPickerType] = useState<'checkIn' | 'checkOut'>('checkIn');
+    const { preselectedRoomId } = useLocalSearchParams();
+    const preselectedRoom = preselectedRoomId ? rooms.find(r => r.id.toString() === preselectedRoomId) : null;
 
+    // --- ВОССТАНОВЛЕННЫЙ КОД 1: Логика загрузки всех комнат ---
     useEffect(() => {
         const fetchAllRooms = async () => {
-            setInitialLoading(true);
             try {
                 const { data, error } = await supabase.from('rooms').select('*');
                 if (error) throw error;
@@ -38,10 +40,18 @@ export default function SearchScreen() {
         fetchAllRooms();
     }, []);
 
+    // --- ВОССТАНОВЛЕННЫЙ КОД 2: Логика поиска ---
     const handleSearch = async () => {
+        if (!checkInDate || !checkOutDate) {
+            alert('Please select both check-in and check-out dates.');
+            return;
+        }
+
         setLoading(true);
         setSearchPerformed(true);
         try {
+            const capacityMatchingRooms = rooms.filter(room => room.capacity >= guestCount);
+            
             const { data: conflictingBookings, error } = await supabase
                 .from('bookings')
                 .select('room_id')
@@ -49,101 +59,78 @@ export default function SearchScreen() {
                 .in('status', ['confirmed', 'pending']);
             
             if (error) throw error;
+
             const bookedRoomIds = new Set(conflictingBookings?.map(b => b.room_id) || []);
-            const finalAvailableRooms = rooms.filter(
-                room => room.capacity >= guestCount && !bookedRoomIds.has(room.id)
-            );
+            let finalAvailableRooms = capacityMatchingRooms.filter(room => !bookedRoomIds.has(room.id));
+
+            if (preselectedRoomId) {
+                finalAvailableRooms = finalAvailableRooms.filter(
+                    room => room.id.toString() === preselectedRoomId
+                );
+            }
             setFilteredRooms(finalAvailableRooms);
         } catch (error) {
             console.error('Error during search:', error);
+            setFilteredRooms([]);
         } finally {
             setLoading(false);
         }
     };
-    
-    // Функция для открытия календаря
-    const showDatePicker = (type: 'checkIn' | 'checkOut') => {
-        setPickerType(type);
-        setPickerVisible(true);
+
+    const incrementGuests = () => {
+        if (guestCount < 10) setGuestCount(guestCount + 1);
     };
 
-    // --- ГЛАВНОЕ ИЗМЕНЕНИЕ: Правильный обработчик выбора даты ---
-    const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-        // На Android всегда скрываем пикер после действия
-        if (Platform.OS === 'android') {
-            setPickerVisible(false);
-        }
+    const decrementGuests = () => {
+        if (guestCount > 1) setGuestCount(guestCount - 1);
+    };
 
-        // Обновляем дату, только если пользователь подтвердил выбор (нажал "OK")
-        if (event.type === 'set' && selectedDate) {
-            if (pickerType === 'checkIn') {
-                setCheckInDate(selectedDate);
-                // Если новая дата заезда позже или равна дате выезда, сдвигаем дату выезда
-                if (selectedDate >= checkOutDate) {
-                    const newCheckOutDate = new Date(selectedDate);
-                    newCheckOutDate.setDate(newCheckOutDate.getDate() + 1);
-                    setCheckOutDate(newCheckOutDate);
-                }
-            } else { // pickerType === 'checkOut'
+    const onDayPress = (day: DateData) => {
+        if (selectionStep === 'checkIn' || !checkInDate) {
+            setCheckInDate(new Date(day.timestamp));
+            setCheckOutDate(null);
+            setSelectionStep('checkOut');
+        } else if (selectionStep === 'checkOut') {
+            const selectedDate = new Date(day.timestamp);
+            if (selectedDate > checkInDate) {
                 setCheckOutDate(selectedDate);
+                setSelectionStep('checkIn');
+                setCalendarVisible(false);
+            } else {
+                setCheckInDate(new Date(day.timestamp));
+                setCheckOutDate(null);
+                setSelectionStep('checkOut');
             }
         }
     };
+    
+    const getMarkedDates = () => {
+        const marked: { [key: string]: any } = {};
+        if (checkInDate) {
+            const start = new Date(checkInDate);
+            marked[start.toISOString().split('T')[0]] = { startingDay: true, color: '#1a2b47', textColor: 'white' };
+            if (checkOutDate) {
+                const end = new Date(checkOutDate);
+                const loopStart = start < end ? start : end;
+                const loopEnd = start < end ? end : start;
+                for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
+                    marked[d.toISOString().split('T')[0]] = { ...marked[d.toISOString().split('T')[0]], color: '#dbeafe', textColor: '#1a2b47' };
+                }
+                marked[start.toISOString().split('T')[0]] = { startingDay: true, color: '#1a2b47', textColor: 'white' };
+                marked[end.toISOString().split('T')[0]] = { endingDay: true, color: '#1a2b47', textColor: 'white' };
+            }
+        }
+        return marked;
+    };
 
-    const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const incrementGuests = () => guestCount < 10 && setGuestCount(guestCount + 1);
-    const decrementGuests = () => guestCount > 1 && setGuestCount(guestCount - 1);
-
+    const formatDate = (date: Date | null) => {
+        if (!date) return 'Select Date';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    
     if (initialLoading) {
         return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#1a2b47" /></View>;
     }
-
-    const renderDatePicker = () => {
-        const isCheckIn = pickerType === 'checkIn';
-        const minimumDate = isCheckIn ? new Date() : new Date(checkInDate.getTime() + 86400000);
-        const currentDate = isCheckIn ? checkInDate : checkOutDate;
-
-        if (Platform.OS === 'ios') {
-            return (
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={isPickerVisible}
-                    onRequestClose={() => setPickerVisible(false)}
-                >
-                    <Pressable style={styles.modalOverlay} onPress={() => setPickerVisible(false)}>
-                        <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-                            <DateTimePicker
-                                value={currentDate}
-                                mode="date"
-                                display="inline"
-                                onChange={handleDateChange}
-                                minimumDate={minimumDate}
-                            />
-                            <TouchableOpacity style={styles.doneButton} onPress={() => setPickerVisible(false)}>
-                                <Text style={styles.doneButtonText}>Done</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Pressable>
-                </Modal>
-            );
-        }
-        
-        // For Android
-        if (isPickerVisible) {
-            return (
-                <DateTimePicker
-                    value={currentDate}
-                    mode="date"
-                    display="default"
-                    onChange={handleDateChange}
-                    minimumDate={minimumDate}
-                />
-            );
-        }
-
-        return null;
-    };
 
     return (
         <View style={styles.container}>
@@ -151,21 +138,13 @@ export default function SearchScreen() {
                 <View style={styles.searchForm}>
                     <Text style={styles.searchTitle}>Find Your Perfect Room</Text>
                     
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>Check-in Date</Text>
-                        <TouchableOpacity style={styles.dateInput} onPress={() => showDatePicker('checkIn')}>
-                            <Calendar size={20} color="#8a94a6" />
-                            <Text style={styles.dateText}>{formatDate(checkInDate)}</Text>
-                        </TouchableOpacity>
-                    </View>
-                    
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>Check-out Date</Text>
-                        <TouchableOpacity style={styles.dateInput} onPress={() => showDatePicker('checkOut')}>
-                            <Calendar size={20} color="#8a94a6" />
-                            <Text style={styles.dateText}>{formatDate(checkOutDate)}</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <Text style={styles.inputLabel}>Check-in & Check-out</Text>
+                    <TouchableOpacity style={styles.dateInput} onPress={() => { setSelectionStep('checkIn'); setCalendarVisible(true); }}>
+                        <CalendarIcon size={20} color="#8a94a6" />
+                        <Text style={styles.dateText}>
+                            {formatDate(checkInDate)} - {checkOutDate ? formatDate(checkOutDate) : '...'}
+                        </Text>
+                    </TouchableOpacity>
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.inputLabel}>Number of Guests</Text>
@@ -179,16 +158,78 @@ export default function SearchScreen() {
                         </View>
                     </View>
                     
-                    <TouchableOpacity style={styles.searchButton} onPress={handleSearch} disabled={loading}>
+                    <TouchableOpacity style={styles.searchButton} onPress={handleSearch} disabled={loading || !checkInDate || !checkOutDate}>
                         {loading ? <ActivityIndicator color="#fff" /> : <><SearchIcon size={20} color="#fff" /><Text style={styles.searchButtonText}>Search Rooms</Text></>}
                     </TouchableOpacity>
                 </View>
                 
-                {renderDatePicker()}
+                <Modal
+                    animationType="fade"
+                    transparent={true}
+                    visible={isCalendarVisible}
+                    onRequestClose={() => setCalendarVisible(false)}
+                >
+                    <Pressable style={styles.modalOverlay} onPress={() => setCalendarVisible(false)}>
+                        <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+                            <Calendar
+                                onDayPress={onDayPress}
+                                markingType={'period'}
+                                markedDates={getMarkedDates()}
+                                minDate={new Date().toISOString().split('T')[0]}
+                            />
+                        </View>
+                    </Pressable>
+                </Modal>
 
+                {/* --- ВОССТАНОВЛЕННЫЙ КОД 3: Отображение результатов поиска --- */}
                 {searchPerformed && (
                     <View style={styles.resultsContainer}>
-                       {/* ... ваш код для отображения результатов ... */}
+                        <Text style={styles.resultsTitle}>
+                            {filteredRooms.length} {filteredRooms.length === 1 ? 'Room' : 'Rooms'} Available
+                        </Text>
+                        
+                        {loading ? (
+                            <ActivityIndicator size="large" color="#1a2b47" style={{ marginTop: 20 }}/>
+                        ) : filteredRooms.length > 0 ? (
+                            filteredRooms.map((room) => (
+                                <TouchableOpacity
+                                    key={room.id}
+                                    style={styles.roomCard}
+                                    onPress={() => router.push({
+                                        pathname: '/room-details',
+                                        params: { 
+                                            id: room.id,
+                                            checkIn: checkInDate!.toISOString(),
+                                            checkOut: checkOutDate!.toISOString(),
+                                            guests: guestCount
+                                        }
+                                    })}
+                                >
+                                    <Image
+                                        source={{ uri: room.image_urls?.[0] || 'https://placehold.co/400x400' }}
+                                        style={styles.roomImage}
+                                    />
+                                    <View style={styles.roomInfo}>
+                                        <Text style={styles.roomName}>{room.name}</Text>
+                                        <Text style={styles.roomDescription} numberOfLines={2}>{room.description}</Text>
+                                        <View style={styles.priceContainer}>
+                                            <Text style={styles.priceAmount}>${room.price_per_night}</Text>
+                                            <Text style={styles.priceNight}>/night</Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            ))
+                        ) : preselectedRoom ? (
+                            <View style={styles.noResultsContainer}>
+                                <Text style={styles.noResultsText}>
+                                    Sorry, "{preselectedRoom.name}" is not available on these dates.
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={styles.noResultsContainer}>
+                                <Text style={styles.noResultsText}>No rooms available for your criteria.</Text>
+                            </View>
+                        )}
                     </View>
                 )}
             </ScrollView>
@@ -203,7 +244,7 @@ const styles = StyleSheet.create({
     searchTitle: { fontSize: 22, fontWeight: 'bold', color: '#1a2b47', marginBottom: 20, textAlign: 'center' },
     inputContainer: { marginBottom: 15 },
     inputLabel: { fontSize: 14, fontWeight: '500', color: '#8a94a6', marginBottom: 8, marginLeft: 5 },
-    dateInput: { flexDirection: 'row', alignItems: 'center', height: 50, borderWidth: 1, borderColor: '#e1e5eb', borderRadius: 12, paddingHorizontal: 15, backgroundColor: '#fff' },
+    dateInput: { flexDirection: 'row', alignItems: 'center', height: 50, borderWidth: 1, borderColor: '#e1e5eb', borderRadius: 12, paddingHorizontal: 15, backgroundColor: '#fff', marginBottom: 15 },
     dateText: { marginLeft: 10, fontSize: 16, color: '#1a2b47' },
     guestInput: { flexDirection: 'row', alignItems: 'center', height: 50, borderWidth: 1, borderColor: '#e1e5eb', borderRadius: 12, paddingHorizontal: 15, backgroundColor: '#fff', justifyContent: 'space-between' },
     guestCounter: { flexDirection: 'row', alignItems: 'center' },
@@ -212,9 +253,18 @@ const styles = StyleSheet.create({
     guestCountText: { marginHorizontal: 15, fontSize: 16, fontWeight: '600', color: '#1a2b47' },
     searchButton: { backgroundColor: '#1a2b47', height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 10, flexDirection: 'row' },
     searchButtonText: { color: 'white', fontSize: 16, fontWeight: '600', marginLeft: 10 },
-    resultsContainer: { paddingHorizontal: 15 },
     modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-    modalContent: { backgroundColor: 'white', borderRadius: 20, padding: 20, width: '90%', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
-    doneButton: { backgroundColor: '#1a2b47', borderRadius: 12, padding: 12, marginTop: 15, alignItems: 'center' },
-    doneButtonText: { color: 'white', fontSize: 16, fontWeight: '600' },
+    modalContent: { backgroundColor: 'white', borderRadius: 20, padding: 10, width: '90%' },
+    resultsContainer: { padding: 15 },
+    resultsTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a2b47', marginBottom: 15 },
+    roomCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3, overflow: 'hidden' },
+    roomImage: { width: width * 0.35, height: '100%' },
+    roomInfo: { flex: 1, padding: 15, justifyContent: 'space-between' },
+    roomName: { fontSize: 16, fontWeight: '600', color: '#1a2b47', marginBottom: 5 },
+    roomDescription: { fontSize: 14, color: '#8a94a6', marginBottom: 10 },
+    priceContainer: { flexDirection: 'row', alignItems: 'baseline', marginTop: 'auto' },
+    priceAmount: { fontSize: 18, fontWeight: 'bold', color: '#1a2b47' },
+    priceNight: { fontSize: 14, color: '#8a94a6', marginLeft: 2 },
+    noResultsContainer: { alignItems: 'center', padding: 30 },
+    noResultsText: { fontSize: 16, fontWeight: '500', color: '#1a2b47', textAlign: 'center' },
 });

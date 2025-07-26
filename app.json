@@ -22,7 +22,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.guestapp-hotel-booking"
+      "package": "app.rork.guestapp_hotel_booking"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -33,7 +33,9 @@
         {
           "origin": "https://rork.com/"
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

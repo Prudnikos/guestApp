@@ -150,24 +150,32 @@ export default function RoomDetailsScreen() {
 
   const handleBookNow = () => {
     if (!user) {
-      router.push('/login');
-      return;
+        router.push('/login');
+        return;
     }
 
-    // Navigate to booking confirmation screen instead of directly booking
+    // --- НАЧАЛО ИСПРАВЛЕНИЯ ---
+    // Если даты не были переданы, устанавливаем их по умолчанию: сегодня и завтра
+    const finalCheckIn = checkIn ? new Date(checkIn as string) : new Date();
+    const finalCheckOut = checkOut ? new Date(checkOut as string) : new Date(Date.now() + 86400000);
+    // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
     router.push({
-      pathname: '/booking-confirmation',
-      params: { 
-        roomId: room.id,
-        checkIn: checkIn as string,
-        checkOut: checkOut as string,
-        guests: guests as string,
-        roomName: room.name,
-        pricePerNight: room.price_per_night,
-        totalPrice: calculateTotal() + Math.round(calculateTotal() * 0.1)
-      }
+        pathname: '/booking-confirmation',
+        params: { 
+            roomId: room.id,
+            // --- ДОБАВЬТЕ ЭТУ СТРОКУ ---
+            imageUrl: room.image_urls?.[0], 
+            // ... остальные параметры
+            checkIn: finalCheckIn.toISOString(), // Передаем исправленные даты
+            checkOut: finalCheckOut.toISOString(), // Передаем исправленные даты
+            guests: guests || room.capacity,
+            roomName: room.name,
+            pricePerNight: room.price_per_night,
+            totalPrice: calculateTotal() + Math.round(calculateTotal() * 0.1)
+        }
     });
-  };
+};
 
   const imageUrls = room.image_urls || ['https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop'];
   const amenities = room.amenities || [];

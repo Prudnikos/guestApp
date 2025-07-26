@@ -257,7 +257,7 @@ export default function BookingScreen() {
           bookingServices.map((bookingService) => (
             <View key={bookingService.id} style={styles.serviceItem}>
               <Image 
-                source={{ uri: bookingService.service?.image_url || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop' }} 
+                source={{ uri: bookingService.service?.image_urls?.[0] || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop' }} 
                 style={styles.serviceImage}
               />
               <View style={styles.serviceInfo}>

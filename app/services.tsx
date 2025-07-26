@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { Service } from '@/types';
@@ -14,117 +14,34 @@ export default function ServicesScreen() {
 
   useEffect(() => {
     const fetchServices = async () => {
+      setLoading(true);
       try {
-        console.log('Fetching services from Supabase...');
-        
-        const { data, error } = await supabase
-          .from('services')
-          .select('*');
-        
-        if (error) {
-          console.error('Supabase error fetching services:', error);
-          console.error('Error code:', error.code);
-          console.error('Error message:', error.message);
-          console.error('Error details:', error.details);
-          console.error('Error hint:', error.hint);
-          
-          // Set fallback services data
-          const fallbackServices = [
-            {
-              id: 1,
-              name: 'Spa Treatment',
-              description: 'Relaxing massage and spa treatments',
-              price: 120,
-              category: 'wellness',
-              image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop'
-            },
-            {
-              id: 2,
-              name: 'Fine Dining',
-              description: 'Gourmet dinner at our restaurant',
-              price: 85,
-              category: 'dining',
-              image_url: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2070&auto=format&fit=crop'
-            },
-            {
-              id: 3,
-              name: 'Airport Transfer',
-              description: 'Luxury car transfer to/from airport',
-              price: 60,
-              category: 'transport',
-              image_url: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?q=80&w=2070&auto=format&fit=crop'
-            },
-            {
-              id: 4,
-              name: 'Guided Tour',
-              description: 'Explore local attractions with a guide',
-              price: 95,
-              category: 'activities',
-              image_url: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?q=80&w=2021&auto=format&fit=crop'
-            }
-          ];
-          
-          setServices(fallbackServices);
-          setFilteredServices(fallbackServices);
-          return;
-        }
-        
-        console.log('Services fetched successfully:', data);
+        const { data, error } = await supabase.from('services').select('*');
+        if (error) throw error;
         setServices(data || []);
         setFilteredServices(data || []);
       } catch (error) {
-        console.error('Unexpected error fetching services:', error);
-        console.error('Error type:', typeof error);
-        console.error('Error string:', String(error));
-        
-        // Set fallback services data for any unexpected errors
-        const fallbackServices = [
-          {
-            id: 1,
-            name: 'Spa Treatment',
-            description: 'Relaxing massage and spa treatments',
-            price: 120,
-            category: 'wellness',
-            image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop'
-          },
-          {
-            id: 2,
-            name: 'Fine Dining',
-            description: 'Gourmet dinner at our restaurant',
-            price: 85,
-            category: 'dining',
-            image_url: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2070&auto=format&fit=crop'
-          }
-        ];
-        
-        setServices(fallbackServices);
-        setFilteredServices(fallbackServices);
+        console.error('Error fetching services:', error);
       } finally {
         setLoading(false);
       }
     };
-    
     fetchServices();
   }, []);
 
   useEffect(() => {
     let result = services;
-    
-    // Apply category filter
     if (selectedCategory) {
       result = result.filter(service => service.category === selectedCategory);
     }
-    
-    // Apply search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         service => 
           service.name.toLowerCase().includes(query) || 
-          service.description.toLowerCase().includes(query)
+          (service.description && service.description.toLowerCase().includes(query))
       );
     }
-    
     setFilteredServices(result);
   }, [searchQuery, selectedCategory, services]);
 
@@ -141,7 +58,6 @@ export default function ServicesScreen() {
       'activities': 'Activities',
       'housekeeping': 'Housekeeping'
     };
-    
     return labels[category] || category.charAt(0).toUpperCase() + category.slice(1);
   };
 
@@ -158,12 +74,7 @@ export default function ServicesScreen() {
 
   return (
     <>
-      <Stack.Screen 
-        options={{
-          title: 'Hotel Services',
-          headerBackTitle: 'Back',
-        }}
-      />
+      <Stack.Screen options={{ title: 'Hotel Services', headerBackTitle: 'Back' }} />
       <View style={styles.container}>
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -182,81 +93,57 @@ export default function ServicesScreen() {
         </View>
         
         {/* Categories */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContainer}
-        >
-          {getCategories().map((category) => (
-            <TouchableOpacity 
-              key={category} 
-              style={[
-                styles.categoryButton,
-                selectedCategory === category && styles.selectedCategoryButton
-              ]}
-              onPress={() => handleCategorySelect(category)}
-            >
-              <Text 
-                style={[
-                  styles.categoryText,
-                  selectedCategory === category && styles.selectedCategoryText
-                ]}
+        <View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesContainer}
+          >
+            {getCategories().map((category) => (
+              <TouchableOpacity 
+                key={category} 
+                style={[ styles.categoryButton, selectedCategory === category && styles.selectedCategoryButton ]}
+                onPress={() => handleCategorySelect(category)}
               >
-                {getCategoryLabel(category)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                <Text style={[ styles.categoryText, selectedCategory === category && styles.selectedCategoryText ]}>
+                  {getCategoryLabel(category)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
         
         {/* Services List */}
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.servicesContainer}>
-            {filteredServices.length > 0 ? (
-              filteredServices.map((service) => (
-                <TouchableOpacity 
-                  key={service.id} 
-                  style={styles.serviceCard}
-                  onPress={() => handleServiceSelect(service)}
-                >
-                  <Image 
-                    source={{ uri: service.image_url || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop' }} 
-                    style={styles.serviceImage}
-                  />
-                  <View style={styles.serviceInfo}>
-                    <Text style={styles.serviceName}>{service.name}</Text>
-                    <Text style={styles.serviceDescription} numberOfLines={2}>
-                      {service.description}
-                    </Text>
-                    <View style={styles.serviceFooter}>
-                      <View style={styles.categoryTag}>
-                        <Text style={styles.categoryTagText}>
-                          {getCategoryLabel(service.category)}
+        {loading ? (
+            <ActivityIndicator style={{ flex: 1 }} size="large" color="#1a2b47" />
+        ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.servicesContainer}>
+                {filteredServices.length > 0 ? (
+                  filteredServices.map((service) => (
+                    <TouchableOpacity key={service.id} style={styles.serviceCard} onPress={() => handleServiceSelect(service)}>
+                      <Image 
+                        source={{ uri: service.image_urls?.[0]?.replace('//', '/') || 'https://placehold.co/200x200' }} 
+                        style={styles.serviceImage}
+                      />
+                      <View style={styles.serviceInfo}>
+                        <Text style={styles.serviceName}>{service.name}</Text>
+                        <Text style={styles.serviceDescription} numberOfLines={2}>
+                          {service.description}
                         </Text>
+                        <View style={styles.serviceFooter}>
+                            <Text style={styles.servicePrice}>${service.price}</Text>
+                        </View>
                       </View>
-                      <Text style={styles.servicePrice}>${service.price}</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.addButton}
-                    onPress={() => handleServiceSelect(service)}
-                  >
-                    <Plus size={20} color="#fff" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.noResultsContainer}>
-                <Text style={styles.noResultsText}>No services found</Text>
-                <Text style={styles.noResultsSubtext}>
-                  Try adjusting your search or filters
-                </Text>
+                      <View style={styles.addButton}><Plus size={20} color="#fff" /></View>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.noResultsContainer}><Text style={styles.noResultsText}>No services found</Text></View>
+                )}
               </View>
-            )}
-          </View>
-          
-          {/* Bottom Spacing */}
-          <View style={{ height: 30 }} />
-        </ScrollView>
+            </ScrollView>
+        )}
       </View>
     </>
   );
@@ -271,6 +158,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 15,
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f2f5',
   },
   searchBar: {
     flex: 1,
@@ -297,11 +186,12 @@ const styles = StyleSheet.create({
   },
   categoriesContainer: {
     paddingHorizontal: 15,
-    paddingBottom: 15,
+    paddingVertical: 15,
   },
   categoryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    height: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
     borderRadius: 20,
     backgroundColor: '#f0f2f5',
     marginRight: 10,
@@ -311,6 +201,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 14,
+    fontWeight: '500',
     color: '#1a2b47',
   },
   selectedCategoryText: {
@@ -326,14 +217,15 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 3,
-    overflow: 'hidden',
+    elevation: 4,
   },
   serviceImage: {
     width: 100,
-    height: 100,
+    height: '100%',
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
   },
   serviceInfo: {
     flex: 1,
@@ -354,16 +246,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  categoryTag: {
-    backgroundColor: '#f0f2f5',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  categoryTagText: {
-    fontSize: 12,
-    color: '#1a2b47',
+    marginTop: 'auto'
   },
   servicePrice: {
     fontSize: 16,
@@ -377,9 +260,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a2b47',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'absolute',
-    bottom: 15,
-    right: 15,
+    alignSelf: 'center',
+    marginRight: 15,
   },
   noResultsContainer: {
     alignItems: 'center',
@@ -389,11 +271,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#1a2b47',
-    marginBottom: 10,
-  },
-  noResultsSubtext: {
-    fontSize: 14,
-    color: '#8a94a6',
-    textAlign: 'center',
   },
 });

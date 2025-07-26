@@ -16,48 +16,42 @@ export default function ServiceDetailsScreen() {
 
   useEffect(() => {
     const fetchService = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('services')
-          .select('*')
-          .eq('id', id)
-          .single();
-
-        if (error) {
-          console.error('Error fetching service:', error);
-          // Set fallback service data
-          setService({
-            id: parseInt(id as string) || 1,
-            name: 'Spa Treatment',
-            description: 'Relaxing massage and spa treatments to rejuvenate your body and mind',
-            price: 120,
-            category: 'wellness',
-            image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop'
-          });
-          return;
+        if (!id) {
+            setLoading(false);
+            return;
         }
 
-        setService(data);
-      } catch (error) {
-        console.error('Error fetching service:', error);
-        // Set fallback service data
-        setService({
-          id: parseInt(id as string) || 1,
-          name: 'Spa Treatment',
-          description: 'Relaxing massage and spa treatments to rejuvenate your body and mind',
-          price: 120,
-          category: 'wellness',
-          image_url: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop'
-        });
-      } finally {
-        setLoading(false);
-      }
+        setLoading(true);
+        try {
+            // --- НАЧИНАЮ ЗАГРУЗКУ ДЕТАЛЕЙ УСЛУГИ ---
+            console.log(`[LOG] Запрашиваю услугу с ID: ${id}`);
+
+            const { data, error } = await supabase
+                .from('services')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            // --- ВАЖНО: Теперь мы выводим ошибку, а не прячем её ---
+            if (error) {
+                throw error;
+            }
+
+            setService(data);
+            console.log("[LOG] Услуга успешно загружена:", data);
+
+        } catch (error) {
+            // --- ТЕПЕРЬ МЫ УВИДИМ НАСТОЯЩУЮ ОШИБКУ В ТЕРМИНАЛЕ ---
+            console.error("[ERROR] Не удалось загрузить услугу:", error);
+            // Оставляем setService(null), чтобы увидеть сообщение "Service not found"
+            setService(null); 
+        } finally {
+            setLoading(false);
+        }
     };
 
-    if (id) {
-      fetchService();
-    }
-  }, []);
+    fetchService();
+}, [id]);
 
   if (loading) {
     return (
@@ -190,7 +184,7 @@ export default function ServiceDetailsScreen() {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Service Image */}
           <Image 
-            source={{ uri: service.image_url || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop' }} 
+            source={{ uri: service.image_urls?.[0]?.replace('//', '/') }} 
             style={styles.serviceImage}
           />
           

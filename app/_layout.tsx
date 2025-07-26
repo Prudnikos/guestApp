@@ -1,3 +1,4 @@
+import { ChatWidget } from '@/components/ChatWidget';
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
@@ -6,9 +7,6 @@ import { useEffect } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-export const unstable_settings = {
-  initialRouteName: "login",
-};
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -47,7 +45,9 @@ function RootLayoutNav() {
           <Stack.Screen name="signup" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
+       <ChatWidget />
       </AuthProvider>
+      
     </GestureHandlerRootView>
   );
 }
