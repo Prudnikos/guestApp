@@ -21,6 +21,11 @@ const CHAT_WINDOW_HEIGHT = 500;
 const SCREEN_PADDING = 20;
 
 export function ChatWidget() {
+    // Отключаем для веб-платформы из-за проблем с GestureDetector
+    if (Platform.OS === 'web') {
+        return null;
+    }
+    
     const { user } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [messageText, setMessageText] = useState('');

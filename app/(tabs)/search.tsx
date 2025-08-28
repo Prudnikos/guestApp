@@ -13,7 +13,6 @@ export default function SearchScreen() {
     const [checkOutDate, setCheckOutDate] = useState<Date | null>(new Date(Date.now() + 86400000));
     const [isCalendarVisible, setCalendarVisible] = useState(false);
     const [selectionStep, setSelectionStep] = useState<'checkIn' | 'checkOut'>('checkIn');
-
     const [guestCount, setGuestCount] = useState(2);
     const [rooms, setRooms] = useState<Room[]>([]);
     const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
@@ -24,7 +23,6 @@ export default function SearchScreen() {
     const { preselectedRoomId } = useLocalSearchParams();
     const preselectedRoom = preselectedRoomId ? rooms.find(r => r.id.toString() === preselectedRoomId) : null;
 
-    // --- ВОССТАНОВЛЕННЫЙ КОД 1: Логика загрузки всех комнат ---
     useEffect(() => {
         const fetchAllRooms = async () => {
             try {
@@ -40,7 +38,6 @@ export default function SearchScreen() {
         fetchAllRooms();
     }, []);
 
-    // --- ВОССТАНОВЛЕННЫЙ КОД 2: Логика поиска ---
     const handleSearch = async () => {
         if (!checkInDate || !checkOutDate) {
             alert('Please select both check-in and check-out dates.');
@@ -86,38 +83,31 @@ export default function SearchScreen() {
     };
 
     const onDayPress = (day: DateData) => {
-        if (selectionStep === 'checkIn' || !checkInDate) {
-            setCheckInDate(new Date(day.timestamp));
-            setCheckOutDate(null);
+        const selectedDate = new Date(day.timestamp);
+        if (selectionStep === 'checkIn' || !checkInDate || selectedDate <= checkInDate) {
+            setCheckInDate(selectedDate);
+            setCheckOutDate(new Date(selectedDate.getTime() + 86400000)); // Set checkout to next day
             setSelectionStep('checkOut');
-        } else if (selectionStep === 'checkOut') {
-            const selectedDate = new Date(day.timestamp);
-            if (selectedDate > checkInDate) {
-                setCheckOutDate(selectedDate);
-                setSelectionStep('checkIn');
-                setCalendarVisible(false);
-            } else {
-                setCheckInDate(new Date(day.timestamp));
-                setCheckOutDate(null);
-                setSelectionStep('checkOut');
-            }
+        } else { // selectionStep === 'checkOut'
+            setCheckOutDate(selectedDate);
+            setSelectionStep('checkIn');
+            setCalendarVisible(false);
         }
     };
     
     const getMarkedDates = () => {
         const marked: { [key: string]: any } = {};
         if (checkInDate) {
-            const start = new Date(checkInDate);
-            marked[start.toISOString().split('T')[0]] = { startingDay: true, color: '#1a2b47', textColor: 'white' };
+            const startStr = checkInDate.toISOString().split('T')[0];
+            marked[startStr] = { startingDay: true, color: '#1a2b47', textColor: 'white' };
             if (checkOutDate) {
-                const end = new Date(checkOutDate);
-                const loopStart = start < end ? start : end;
-                const loopEnd = start < end ? end : start;
-                for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
-                    marked[d.toISOString().split('T')[0]] = { ...marked[d.toISOString().split('T')[0]], color: '#dbeafe', textColor: '#1a2b47' };
+                const endStr = checkOutDate.toISOString().split('T')[0];
+                for (let d = new Date(checkInDate); d <= checkOutDate; d.setDate(d.getDate() + 1)) {
+                    const dStr = d.toISOString().split('T')[0];
+                    marked[dStr] = { ...marked[dStr], color: '#dbeafe', textColor: '#1a2b47' };
                 }
-                marked[start.toISOString().split('T')[0]] = { startingDay: true, color: '#1a2b47', textColor: 'white' };
-                marked[end.toISOString().split('T')[0]] = { endingDay: true, color: '#1a2b47', textColor: 'white' };
+                marked[startStr] = { startingDay: true, color: '#1a2b47', textColor: 'white' };
+                marked[endStr] = { endingDay: true, color: '#1a2b47', textColor: 'white' };
             }
         }
         return marked;
@@ -181,7 +171,6 @@ export default function SearchScreen() {
                     </Pressable>
                 </Modal>
 
-                {/* --- ВОССТАНОВЛЕННЫЙ КОД 3: Отображение результатов поиска --- */}
                 {searchPerformed && (
                     <View style={styles.resultsContainer}>
                         <Text style={styles.resultsTitle}>

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm start)",
+      "Bash(npm run start-web:*)",
+      "Bash(taskkill:*)",
+      "Bash(bash:*)",
+      "Bash(npx expo start:*)",
+      "Bash(bun expo start:*)",
+      "Bash(bun install:*)",
+      "Bash(npm install:*)",
+      "Bash(npx @expo/cli@latest start)",
+      "Bash(yarn install)",
+      "Bash(expo start)",
+      "Bash(npx @expo/cli@latest start --clear)",
+      "Bash(npx @expo/cli@latest start:*)",
+      "Read(c:\\Users\\Кос\\Downloads/**)",
+      "Bash(npx expo install:*)",
+      "Read(c:\\Users\\Кос\\Downloads/**)",
+      "Bash(expo start:*)",
+      "Bash(npx serve:*)",
+      "Bash(npx create-expo-app:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
