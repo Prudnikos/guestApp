@@ -22,7 +22,16 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.guestapp_hotel_booking"
+      "package": "app.rork.guestapp_hotel_booking",
+      "permissions": [
+        "NOTIFICATIONS"
+      ]
+    },
+    "notification": {
+      "icon": "./assets/images/icon.png",
+      "color": "#1a2b47",
+      "androidMode": "default",
+      "androidCollapsedTitle": "GuestApp"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -38,6 +47,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "dc20f3ad-e39d-42a4-b009-fa512bbdd16e"
+      },
+      "router": {
+        "origin": "https://rork.com/"
+      }
+    },
+    "owner": "vodaaparthotel"
   }
 }

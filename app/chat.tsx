@@ -3,7 +3,8 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Keyboard
 import { Stack } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { Send } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
+import MessageNotificationService from '@/services/MessageNotificationService';
 
 // --- ИЗМЕНЕНИЕ 1: Обновляем тип Message ---
 export interface Message {
@@ -16,7 +17,8 @@ export interface Message {
 }
 
 export default function ChatScreen() {
-  const { user } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -147,6 +149,23 @@ export default function ChatScreen() {
         console.error('Supabase message error:', error);
         // Откатываем оптимистичное обновление в случае ошибки
         setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
+      } else {
+        // Отправляем push-уведомление менеджерам отеля
+        // Получаем имя гостя из профиля
+        const { data: profileData } = await supabase
+          .from('users')
+          .select('email')
+          .eq('id', user.id)
+          .single();
+        
+        const guestName = profileData?.email?.split('@')[0] || 'Guest';
+        
+        await MessageNotificationService.notifyHotelStaffNewMessage(
+          user.id,
+          guestName,
+          messageContent,
+          currentConversationId!
+        );
       }
     } catch (error) {
       console.error('Unexpected error sending message:', error);
@@ -217,7 +236,7 @@ export default function ChatScreen() {
                 onPress={handleSend}
                 disabled={!newMessage.trim() || sending}
               >
-                {sending ? <ActivityIndicator size="small" color="#fff" /> : <Send size={20} color="#fff" />}
+                {sending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{color: '#fff'}}>→</Text>}
               </TouchableOpacity>
             </View>
           </>

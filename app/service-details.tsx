@@ -4,15 +4,18 @@ import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { Service } from '@/types';
-import { Minus, Plus } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
+import CustomAlert from '@/components/CustomAlert';
 
 export default function ServiceDetailsScreen() {
   const { id } = useLocalSearchParams();
-  const { user } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
   const [service, setService] = useState<Service | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
   const [addingToBooking, setAddingToBooking] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     const fetchService = async () => {
@@ -149,21 +152,8 @@ export default function ServiceDetailsScreen() {
       
       console.log('Service added successfully:', data);
       
-      // Show success message and navigate back
-      Alert.alert(
-        'Success!',
-        'Service added to your booking successfully!',
-        [
-          {
-            text: 'View Booking',
-            onPress: () => router.replace('/(tabs)/booking')
-          },
-          {
-            text: 'Continue Shopping',
-            onPress: () => router.back()
-          }
-        ]
-      );
+      // Show success modal
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error adding service to booking:', error);
       Alert.alert('Error', `Failed to add service: ${error instanceof Error ? error.message : 'Please try again.'}`);
@@ -184,7 +174,28 @@ export default function ServiceDetailsScreen() {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Service Image */}
           <Image 
-            source={{ uri: service.image_urls?.[0]?.replace('//', '/') }} 
+            source={{ uri: (() => {
+              // Use predefined images for services based on name/category
+              let imageUrl = 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop';
+              
+              if (service.name?.toLowerCase().includes('трансфер') || service.name?.toLowerCase().includes('transfer')) {
+                imageUrl = 'https://images.unsplash.com/photo-1556742111-a301076d9d18?q=80&w=2070&auto=format&fit=crop';
+              } else if (service.name?.toLowerCase().includes('парков') || service.name?.toLowerCase().includes('parking')) {
+                imageUrl = 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=2070&auto=format&fit=crop';
+              } else if (service.name?.toLowerCase().includes('спа') || service.name?.toLowerCase().includes('spa')) {
+                imageUrl = 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop';
+              } else if (service.name?.toLowerCase().includes('ужин') || service.name?.toLowerCase().includes('dinner') || service.name?.toLowerCase().includes('романт')) {
+                imageUrl = 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2070&auto=format&fit=crop';
+              } else if (service.name?.toLowerCase().includes('завтрак') || service.name?.toLowerCase().includes('breakfast')) {
+                imageUrl = 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=2070&auto=format&fit=crop';
+              } else if (service.name?.toLowerCase().includes('фитнес') || service.name?.toLowerCase().includes('gym')) {
+                imageUrl = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070&auto=format&fit=crop';
+              } else if (service.name?.toLowerCase().includes('прачеч') || service.name?.toLowerCase().includes('laundry')) {
+                imageUrl = 'https://images.unsplash.com/photo-1545173168-9b955fa52e02?q=80&w=2070&auto=format&fit=crop';
+              }
+              
+              return imageUrl;
+            })() }} 
             style={styles.serviceImage}
           />
           
@@ -215,14 +226,14 @@ export default function ServiceDetailsScreen() {
                 style={styles.quantityButton}
                 onPress={decrementQuantity}
               >
-                <Minus size={20} color="#1a2b47" />
+                <Ionicons name="remove" size={20} color="#1a2b47" />
               </TouchableOpacity>
               <Text style={styles.quantityText}>{quantity}</Text>
               <TouchableOpacity 
                 style={styles.quantityButton}
                 onPress={incrementQuantity}
               >
-                <Plus size={20} color="#1a2b47" />
+                <Ionicons name="add" size={20} color="#1a2b47" />
               </TouchableOpacity>
             </View>
             
@@ -251,6 +262,31 @@ export default function ServiceDetailsScreen() {
           </View>
         </ScrollView>
       </View>
+      
+      {/* Success Modal */}
+      <CustomAlert
+        visible={showSuccessModal}
+        title="Success!"
+        message="Service added to your booking successfully!"
+        buttons={[
+          {
+            text: 'View Booking',
+            onPress: () => {
+              setShowSuccessModal(false);
+              router.replace('/(tabs)/booking');
+            },
+            style: 'primary'
+          },
+          {
+            text: 'Continue Shopping',
+            onPress: () => {
+              setShowSuccessModal(false);
+              router.back();
+            },
+            style: 'secondary'
+          }
+        ]}
+      />
     </>
   );
 }

@@ -8,11 +8,18 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { signIn, loading } = useAuth();
+  const auth = useAuth();
+  const signIn = auth?.signIn;
+  const loading = auth?.loading;
 
   const handleLogin = async () => {
     if (!email || !password) {
       setError('Please fill in all fields');
+      return;
+    }
+    
+    if (!signIn) {
+      setError('Authentication not available');
       return;
     }
 

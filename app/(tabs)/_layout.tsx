@@ -2,10 +2,17 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { Redirect } from 'expo-router';
-import { Home, Search, User, MessageCircle } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
-  const { user, loading } = useAuth();
+  const auth = useAuth();
+  
+  // Проверяем, что контекст доступен
+  if (!auth) {
+    return null;
+  }
+  
+  const { user, loading } = auth;
 
   // If the user is not logged in, redirect to the login screen
   if (!loading && !user) {
@@ -43,7 +50,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="home" size={24} color={color} />,
           headerTitle: 'Luxury Hotel',
         }}
       />
@@ -51,7 +58,7 @@ export default function TabLayout() {
         name="search"
         options={{
           title: 'Search',
-          tabBarIcon: ({ color }) => <Search size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="search" size={24} color={color} />,
           headerTitle: 'Find Rooms',
         }}
       />
@@ -59,7 +66,7 @@ export default function TabLayout() {
         name="booking"
         options={{
           title: 'My Booking',
-          tabBarIcon: ({ color }) => <MessageCircle size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="chatbubble-outline" size={24} color={color} />,
           headerTitle: 'My Booking',
         }}
       />
@@ -67,7 +74,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="person" size={24} color={color} />,
           headerTitle: 'My Profile',
         }}
       />

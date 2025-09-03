@@ -4,14 +4,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Room, Service } from '@/types';
 import { router } from 'expo-router';
-import { ArrowRight, Star } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 const cardWidth = width * 0.75;
 const serviceCardWidth = width * 0.45;
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
   const [featuredRooms, setFeaturedRooms] = useState<Room[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,15 +63,35 @@ export default function HomeScreen() {
             <TouchableOpacity onPress={navigateToSearch}><Text style={styles.seeAllText}>See All</Text></TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScrollContainer}>
-            {featuredRooms.map((room) => (
-              <TouchableOpacity key={room.id} style={styles.roomCard} onPress={() => router.push({ pathname: '/search', params: { preselectedRoomId: room.id }})}>
-                <Image source={{ uri: room.image_urls?.[0]?.replace('//', '/') }} style={styles.roomImage} />
-                <View style={styles.roomInfo}>
-                  <Text style={styles.roomName} numberOfLines={1}>{room.name}</Text>
-                  <Text style={styles.priceText}>${room.price_per_night}/night</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {featuredRooms.map((room) => {
+              const imageUrls = typeof room.image_urls === 'string' 
+                ? JSON.parse(room.image_urls)?.photos || [] 
+                : room.image_urls?.photos || [];
+              const firstImage = imageUrls[0] || 'https://via.placeholder.com/400x300';
+              
+              return (
+                <TouchableOpacity key={room.id} style={styles.roomCard} onPress={() => router.push({ 
+                  pathname: '/room-details', 
+                  params: { 
+                    id: room.id,
+                    checkIn: new Date().toISOString(),
+                    checkOut: new Date(Date.now() + 86400000).toISOString(),
+                    guests: 2
+                  }
+                })}>
+                  <Image source={{ uri: firstImage }} style={styles.roomImage} />
+                  <View style={styles.roomInfo}>
+                    <View style={styles.roomTitleContainer}>
+                      <Text style={styles.roomName} numberOfLines={1}>{room.room_number || 'Room'}</Text>
+                      {room.room_type && (
+                        <Text style={styles.roomType} numberOfLines={1}>{room.room_type}</Text>
+                      )}
+                    </View>
+                    <Text style={styles.priceText}>${room.price_per_night}/night</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -81,14 +102,39 @@ export default function HomeScreen() {
             <TouchableOpacity onPress={() => router.push('/services')}><Text style={styles.seeAllText}>See All</Text></TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScrollContainer}>
-            {services.map((service) => (
-              <TouchableOpacity key={service.id} style={styles.serviceCard} onPress={() => router.push({ pathname: '/service-details', params: { id: service.id }})}>
-                <Image source={{ uri: service.image_urls?.[0]?.replace('//', '/') }} style={styles.serviceImage} />
-                <View style={styles.serviceInfo}>
-                  <Text style={styles.serviceName} numberOfLines={2}>{service.name}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {services.map((service) => {
+              // Use predefined images for services based on name/category
+              let firstImage = 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop'; // Default spa image
+              
+              // Match specific services with appropriate stock images
+              if (service.name?.toLowerCase().includes('трансфер') || service.name?.toLowerCase().includes('transfer')) {
+                firstImage = 'https://images.unsplash.com/photo-1556742111-a301076d9d18?q=80&w=2070&auto=format&fit=crop'; // Transfer/taxi image
+              } else if (service.name?.toLowerCase().includes('парков') || service.name?.toLowerCase().includes('parking')) {
+                firstImage = 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=2070&auto=format&fit=crop'; // Parking image
+              } else if (service.name?.toLowerCase().includes('спа') || service.name?.toLowerCase().includes('spa')) {
+                firstImage = 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop'; // Spa image
+              } else if (service.name?.toLowerCase().includes('ужин') || service.name?.toLowerCase().includes('dinner') || service.name?.toLowerCase().includes('романт')) {
+                firstImage = 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2070&auto=format&fit=crop'; // Romantic dinner image
+              } else if (service.name?.toLowerCase().includes('завтрак') || service.name?.toLowerCase().includes('breakfast')) {
+                firstImage = 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=2070&auto=format&fit=crop'; // Breakfast image
+              } else if (service.name?.toLowerCase().includes('фитнес') || service.name?.toLowerCase().includes('gym')) {
+                firstImage = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070&auto=format&fit=crop'; // Gym image
+              } else if (service.name?.toLowerCase().includes('прачеч') || service.name?.toLowerCase().includes('laundry')) {
+                firstImage = 'https://images.unsplash.com/photo-1545173168-9b955fa52e02?q=80&w=2070&auto=format&fit=crop'; // Laundry image
+              }
+              
+              return (
+                <TouchableOpacity key={service.id} style={styles.serviceCard} onPress={() => router.push({ pathname: '/service-details', params: { id: service.id }})}>
+                  <Image 
+                    source={{ uri: firstImage }} 
+                    style={styles.serviceImage}
+                  />
+                  <View style={styles.serviceInfo}>
+                    <Text style={styles.serviceName} numberOfLines={2}>{service.name}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -98,7 +144,7 @@ export default function HomeScreen() {
             <Image source={{ uri: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?q=80&w=2070&auto=format&fit=crop' }} style={styles.offerImage} />
             <View style={styles.offerContent}>
               <Text style={styles.offerTitle}>Summer Special</Text>
-              <TouchableOpacity style={styles.offerButton}><Text style={styles.offerButtonText}>View Offer</Text><ArrowRight size={16} color="#fff" /></TouchableOpacity>
+              <TouchableOpacity style={styles.offerButton}><Text style={styles.offerButtonText}>View Offer</Text><Ionicons name="arrow-forward" size={16} color="#fff" /></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -177,7 +223,13 @@ const styles = StyleSheet.create({
   roomInfo: { 
     padding: 15 
   },
-  roomName: { fontSize: 16, fontWeight: '600', color: '#1a2b47' },
+  roomTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  roomName: { fontSize: 16, fontWeight: '600', color: '#1a2b47', marginRight: 6 },
+  roomType: { fontSize: 13, color: '#8a94a6', fontWeight: '500' },
   priceText: { fontSize: 14, fontWeight: '600', color: '#1a2b47', marginTop: 8 },
   serviceCard: { 
     width: serviceCardWidth, 

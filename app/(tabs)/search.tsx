@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, ActivityIndicator
 import { supabase } from '@/lib/supabase';
 import { Room } from '@/types';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Calendar as CalendarIcon, Users, Search as SearchIcon } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Calendar, DateData } from 'react-native-calendars';
 
 const { width } = Dimensions.get('window');
@@ -19,6 +19,8 @@ export default function SearchScreen() {
     const [loading, setLoading] = useState(false);
     const [searchPerformed, setSearchPerformed] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
+    const [bookedRoomIds, setBookedRoomIds] = useState<Set<string>>(new Set());
+    const [lastDateSearch, setLastDateSearch] = useState<{checkIn: Date | null, checkOut: Date | null}>({checkIn: null, checkOut: null});
 
     const { preselectedRoomId } = useLocalSearchParams();
     const preselectedRoom = preselectedRoomId ? rooms.find(r => r.id.toString() === preselectedRoomId) : null;
@@ -38,9 +40,25 @@ export default function SearchScreen() {
         fetchAllRooms();
     }, []);
 
-    const handleSearch = async () => {
+    // Auto-search when dates change
+    useEffect(() => {
+        if (checkInDate && checkOutDate && !initialLoading && rooms.length > 0) {
+            // Only fetch bookings when dates change
+            if (lastDateSearch.checkIn?.getTime() !== checkInDate.getTime() || 
+                lastDateSearch.checkOut?.getTime() !== checkOutDate.getTime()) {
+                handleSearch(false);
+                setLastDateSearch({checkIn: checkInDate, checkOut: checkOutDate});
+            }
+        }
+    }, [checkInDate, checkOutDate]);
+
+    // Fast local filtering when guest count changes (removed - now handled directly in increment/decrement)
+
+    const handleSearch = async (showAlert = true) => {
         if (!checkInDate || !checkOutDate) {
-            alert('Please select both check-in and check-out dates.');
+            if (showAlert) {
+                alert('Please select both check-in and check-out dates.');
+            }
             return;
         }
 
@@ -57,8 +75,9 @@ export default function SearchScreen() {
             
             if (error) throw error;
 
-            const bookedRoomIds = new Set(conflictingBookings?.map(b => b.room_id) || []);
-            let finalAvailableRooms = capacityMatchingRooms.filter(room => !bookedRoomIds.has(room.id));
+            const bookedIds = new Set(conflictingBookings?.map(b => b.room_id) || []);
+            setBookedRoomIds(bookedIds); // Save for fast local filtering
+            let finalAvailableRooms = capacityMatchingRooms.filter(room => !bookedIds.has(room.id));
 
             if (preselectedRoomId) {
                 finalAvailableRooms = finalAvailableRooms.filter(
@@ -75,11 +94,27 @@ export default function SearchScreen() {
     };
 
     const incrementGuests = () => {
-        if (guestCount < 10) setGuestCount(guestCount + 1);
+        if (guestCount < 10) {
+            const newCount = guestCount + 1;
+            setGuestCount(newCount);
+            // Instant local filtering
+            if (searchPerformed && rooms.length > 0) {
+                const filtered = rooms.filter(room => room.capacity >= newCount && !bookedRoomIds.has(room.id));
+                setFilteredRooms(preselectedRoomId ? filtered.filter(r => r.id.toString() === preselectedRoomId) : filtered);
+            }
+        }
     };
 
     const decrementGuests = () => {
-        if (guestCount > 1) setGuestCount(guestCount - 1);
+        if (guestCount > 1) {
+            const newCount = guestCount - 1;
+            setGuestCount(newCount);
+            // Instant local filtering
+            if (searchPerformed && rooms.length > 0) {
+                const filtered = rooms.filter(room => room.capacity >= newCount && !bookedRoomIds.has(room.id));
+                setFilteredRooms(preselectedRoomId ? filtered.filter(r => r.id.toString() === preselectedRoomId) : filtered);
+            }
+        }
     };
 
     const onDayPress = (day: DateData) => {
@@ -130,7 +165,7 @@ export default function SearchScreen() {
                     
                     <Text style={styles.inputLabel}>Check-in & Check-out</Text>
                     <TouchableOpacity style={styles.dateInput} onPress={() => { setSelectionStep('checkIn'); setCalendarVisible(true); }}>
-                        <CalendarIcon size={20} color="#8a94a6" />
+                        <Ionicons name="calendar" size={20} color="#8a94a6" />
                         <Text style={styles.dateText}>
                             {formatDate(checkInDate)} - {checkOutDate ? formatDate(checkOutDate) : '...'}
                         </Text>
@@ -139,7 +174,7 @@ export default function SearchScreen() {
                     <View style={styles.inputContainer}>
                         <Text style={styles.inputLabel}>Number of Guests</Text>
                         <View style={styles.guestInput}>
-                            <Users size={20} color="#8a94a6" />
+                            <Ionicons name="person" size={20} color="#8a94a6" />
                             <View style={styles.guestCounter}>
                                 <TouchableOpacity style={styles.counterButton} onPress={decrementGuests}><Text style={styles.counterButtonText}>-</Text></TouchableOpacity>
                                 <Text style={styles.guestCountText}>{guestCount}</Text>
@@ -149,7 +184,12 @@ export default function SearchScreen() {
                     </View>
                     
                     <TouchableOpacity style={styles.searchButton} onPress={handleSearch} disabled={loading || !checkInDate || !checkOutDate}>
-                        {loading ? <ActivityIndicator color="#fff" /> : <><SearchIcon size={20} color="#fff" /><Text style={styles.searchButtonText}>Search Rooms</Text></>}
+                        {loading ? <ActivityIndicator color="#fff" /> : (
+                            <>
+                                <Ionicons name="search" size={20} color="#fff" />
+                                <Text style={styles.searchButtonText}>Search Rooms</Text>
+                            </>
+                        )}
                     </TouchableOpacity>
                 </View>
                 
@@ -195,11 +235,21 @@ export default function SearchScreen() {
                                     })}
                                 >
                                     <Image
-                                        source={{ uri: room.image_urls?.[0] || 'https://placehold.co/400x400' }}
+                                        source={{ uri: (() => {
+                                            const imageUrls = typeof room.image_urls === 'string' 
+                                                ? JSON.parse(room.image_urls)?.photos || [] 
+                                                : room.image_urls?.photos || [];
+                                            return imageUrls[0] || 'https://placehold.co/400x400';
+                                        })() }}
                                         style={styles.roomImage}
                                     />
                                     <View style={styles.roomInfo}>
-                                        <Text style={styles.roomName}>{room.name}</Text>
+                                        <View style={styles.roomTitleContainer}>
+                                            <Text style={styles.roomName}>{room.room_number || 'Room'}</Text>
+                                            {room.room_type && (
+                                                <Text style={styles.roomType}>{room.room_type}</Text>
+                                            )}
+                                        </View>
                                         <Text style={styles.roomDescription} numberOfLines={2}>{room.description}</Text>
                                         <View style={styles.priceContainer}>
                                             <Text style={styles.priceAmount}>${room.price_per_night}</Text>
@@ -211,7 +261,7 @@ export default function SearchScreen() {
                         ) : preselectedRoom ? (
                             <View style={styles.noResultsContainer}>
                                 <Text style={styles.noResultsText}>
-                                    Sorry, "{preselectedRoom.name}" is not available on these dates.
+                                    Sorry, "{preselectedRoom.room_number || preselectedRoom.room_type || 'This room'}" is not available on these dates.
                                 </Text>
                             </View>
                         ) : (
@@ -249,7 +299,14 @@ const styles = StyleSheet.create({
     roomCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3, overflow: 'hidden' },
     roomImage: { width: width * 0.35, height: '100%' },
     roomInfo: { flex: 1, padding: 15, justifyContent: 'space-between' },
-    roomName: { fontSize: 16, fontWeight: '600', color: '#1a2b47', marginBottom: 5 },
+    roomTitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 5,
+        flexWrap: 'wrap',
+    },
+    roomName: { fontSize: 16, fontWeight: '600', color: '#1a2b47', marginRight: 8 },
+    roomType: { fontSize: 14, color: '#8a94a6', fontWeight: '500' },
     roomDescription: { fontSize: 14, color: '#8a94a6', marginBottom: 10 },
     priceContainer: { flexDirection: 'row', alignItems: 'baseline', marginTop: 'auto' },
     priceAmount: { fontSize: 18, fontWeight: 'bold', color: '#1a2b47' },

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Image, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
-import { BrainCircuit, X, Send } from 'lucide-react-native';
+// import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -162,7 +162,7 @@ export function ChatWidget() {
                         <GestureDetector gesture={panGesture}>
                             <View style={styles.header}>
                                 <Text style={styles.headerTitle}>AI Assistant</Text>
-                                <TouchableOpacity onPress={() => setIsOpen(false)}><X size={20} color="#fff" /></TouchableOpacity>
+                                <TouchableOpacity onPress={() => setIsOpen(false)}><Text style={{color: '#fff'}}>✕</Text></TouchableOpacity>
                             </View>
                         </GestureDetector>
                         
@@ -179,7 +179,7 @@ export function ChatWidget() {
                         <View style={styles.inputContainer}>
                             <TextInput style={styles.input} placeholder="Ask the AI..." value={messageText} onChangeText={setMessageText} multiline/>
                             <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage} disabled={loading}>
-                                {loading ? <ActivityIndicator size="small" color="#fff" /> : <Send size={20} color="#fff" />}
+                                {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{color: '#fff'}}>→</Text>}
                             </TouchableOpacity>
                         </View>
                     </View>

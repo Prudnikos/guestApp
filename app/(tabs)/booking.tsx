@@ -4,10 +4,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Booking, BookingService, Room, Service } from '@/types';
 import { router } from 'expo-router';
-import { Calendar, Clock, MapPin, CreditCard, MessageCircle, AlertTriangle, User, Phone, Mail } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function BookingScreen() {
-  const { user } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
   const [booking, setBooking] = useState<Booking | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [bookingServices, setBookingServices] = useState<BookingService[]>([]);
@@ -113,7 +114,11 @@ export default function BookingScreen() {
 
   // FIXED: Calculate real services total from booking_services
   const calculateServicesTotal = () => {
-    return bookingServices.reduce((total, service) => total + (service.price_at_booking || 0), 0);
+    return bookingServices.reduce((total, bookingService) => {
+      const price = bookingService.price_at_booking || 0;
+      const quantity = bookingService.quantity || 1;
+      return total + (price * quantity);
+    }, 0);
   };
 
   // FIXED: Calculate real room total
@@ -124,12 +129,25 @@ export default function BookingScreen() {
 
   // FIXED: Calculate real taxes
   const calculateTaxes = () => {
-    return Math.round(calculateRoomTotal() * 0.1);
+    return Math.round((calculateRoomTotal() + calculateServicesTotal()) * 0.1);
   };
 
   // FIXED: Use real total from booking or calculate if not available
   const calculateGrandTotal = () => {
-    return booking?.total_amount || (calculateRoomTotal() + calculateServicesTotal() + calculateTaxes());
+    const roomTotal = calculateRoomTotal();
+    const servicesTotal = calculateServicesTotal();
+    const taxes = calculateTaxes();
+    const grandTotal = roomTotal + servicesTotal + taxes;
+    
+    console.log('Room Total:', roomTotal);
+    console.log('Services Total:', servicesTotal);
+    console.log('Taxes:', taxes);
+    console.log('Grand Total:', grandTotal);
+    console.log('Booking total_amount from DB:', booking?.total_amount);
+    console.log('Booking Services:', bookingServices);
+    
+    // Always use calculated total to include services
+    return grandTotal;
   };
 
   const getStatusColor = (status: string) => {
@@ -205,11 +223,11 @@ export default function BookingScreen() {
         <Text style={styles.sectionTitle}>Guest Information</Text>
         <View style={styles.guestInfo}>
           <View style={styles.guestItem}>
-            <Mail size={16} color="#8a94a6" />
+            <Ionicons name="mail" size={16} color="#8a94a6" />
             <Text style={styles.guestText}>{user?.email}</Text>
           </View>
           <View style={styles.guestItem}>
-            <User size={16} color="#8a94a6" />
+            <Ionicons name="person" size={16} color="#8a94a6" />
             <Text style={styles.guestText}>{booking.guests_count} {booking.guests_count === 1 ? 'Guest' : 'Guests'}</Text>
           </View>
         </View>
@@ -219,24 +237,34 @@ export default function BookingScreen() {
       {room && (
         <View style={styles.roomContainer}>
           <Image 
-            source={{ uri: room.image_urls?.[0] || 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop' }} 
+            source={{ uri: (() => {
+              const imageUrls = typeof room.image_urls === 'string' 
+                ? JSON.parse(room.image_urls)?.photos || [] 
+                : room.image_urls?.photos || [];
+              return imageUrls[0] || 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?q=80&w=2070&auto=format&fit=crop';
+            })() }} 
             style={styles.roomImage}
           />
           <View style={styles.roomDetails}>
-            <Text style={styles.roomName}>{room.name}</Text>
+            <View style={styles.roomTitleContainer}>
+              <Text style={styles.roomName}>{room.room_number || 'Room'}</Text>
+              {room.room_type && (
+                <Text style={styles.roomType}>{room.room_type}</Text>
+              )}
+            </View>
             <View style={styles.roomInfo}>
               <View style={styles.infoItem}>
-                <Calendar size={16} color="#8a94a6" />
+                <Ionicons name="calendar" size={16} color="#8a94a6" />
                 <Text style={styles.infoText}>
                   {formatDate(booking.check_in)} - {formatDate(booking.check_out)}
                 </Text>
               </View>
               <View style={styles.infoItem}>
-                <Clock size={16} color="#8a94a6" />
+                <Ionicons name="time" size={16} color="#8a94a6" />
                 <Text style={styles.infoText}>{calculateNights()} nights</Text>
               </View>
               <View style={styles.infoItem}>
-                <MapPin size={16} color="#8a94a6" />
+                <Ionicons name="location" size={16} color="#8a94a6" />
                 <Text style={styles.infoText}>Luxury Hotel</Text>
               </View>
             </View>
@@ -257,7 +285,29 @@ export default function BookingScreen() {
           bookingServices.map((bookingService) => (
             <View key={bookingService.id} style={styles.serviceItem}>
               <Image 
-                source={{ uri: bookingService.service?.image_urls?.[0] || 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop' }} 
+                source={{ uri: (() => {
+                  // Используем предопределенные изображения для услуг по названию
+                  const serviceName = bookingService.service?.name || '';
+                  let imageUrl = 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop'; // Default spa
+                  
+                  if (serviceName.toLowerCase().includes('трансфер') || serviceName.toLowerCase().includes('transfer')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1556742111-a301076d9d18?q=80&w=2070&auto=format&fit=crop';
+                  } else if (serviceName.toLowerCase().includes('парков') || serviceName.toLowerCase().includes('parking')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=2070&auto=format&fit=crop';
+                  } else if (serviceName.toLowerCase().includes('спа') || serviceName.toLowerCase().includes('spa')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop';
+                  } else if (serviceName.toLowerCase().includes('ужин') || serviceName.toLowerCase().includes('dinner') || serviceName.toLowerCase().includes('романт')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2070&auto=format&fit=crop';
+                  } else if (serviceName.toLowerCase().includes('завтрак') || serviceName.toLowerCase().includes('breakfast')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=2070&auto=format&fit=crop';
+                  } else if (serviceName.toLowerCase().includes('фитнес') || serviceName.toLowerCase().includes('gym')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070&auto=format&fit=crop';
+                  } else if (serviceName.toLowerCase().includes('прачеч') || serviceName.toLowerCase().includes('laundry')) {
+                    imageUrl = 'https://images.unsplash.com/photo-1545173168-9b955fa52e02?q=80&w=2070&auto=format&fit=crop';
+                  }
+                  
+                  return imageUrl;
+                })() }} 
                 style={styles.serviceImage}
               />
               <View style={styles.serviceInfo}>
@@ -303,7 +353,7 @@ export default function BookingScreen() {
           <Text style={styles.billTotalAmount}>${calculateGrandTotal()}</Text>
         </View>
         <TouchableOpacity style={styles.paymentButton}>
-          <CreditCard size={20} color="#fff" />
+          <Ionicons name="card" size={20} color="#fff" />
           <Text style={styles.paymentButtonText}>Payment at Hotel</Text>
         </TouchableOpacity>
       </View>
@@ -314,14 +364,14 @@ export default function BookingScreen() {
           style={styles.supportButton}
           onPress={handleContactSupport}
         >
-          <MessageCircle size={20} color="#1a2b47" />
+          <Ionicons name="chatbubbles" size={20} color="#1a2b47" />
           <Text style={styles.supportButtonText}>Contact Support</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.supportButton, styles.reportButton]}
           onPress={handleReportIssue}
         >
-          <AlertTriangle size={20} color="#1a2b47" />
+          <Ionicons name="warning" size={20} color="#1a2b47" />
           <Text style={styles.supportButtonText}>Report an Issue</Text>
         </TouchableOpacity>
       </View>
@@ -397,8 +447,8 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   statusTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 16, // Уменьшили с 20 до 16 (на 20%)
+    fontWeight: '600', // Сделали чуть менее жирным
     color: '#1a2b47',
   },
   statusBadge: {
@@ -453,11 +503,22 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   roomDetails: {},
+  roomTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    flexWrap: 'wrap',
+  },
   roomName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1a2b47',
-    marginBottom: 10,
+    marginRight: 8,
+  },
+  roomType: {
+    fontSize: 15,
+    color: '#8a94a6',
+    fontWeight: '500',
   },
   roomInfo: {
     gap: 8,

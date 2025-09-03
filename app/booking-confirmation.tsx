@@ -3,12 +3,14 @@ import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, Activi
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { Calendar, Users, User, Phone, Mail } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import CustomAlert from '@/components/CustomAlert';
+import ChannexBookingService from '@/services/ChannexBookingService';
 
 export default function BookingConfirmationScreen() {
     const { roomId, checkIn, checkOut, guests, roomName, pricePerNight, totalPrice, imageUrl } = useLocalSearchParams();
-    const { user } = useAuth();
+    const auth = useAuth();
+  const user = auth?.user;
     const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
     const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
     const [phone, setPhone] = useState('');
@@ -39,32 +41,68 @@ export default function BookingConfirmationScreen() {
 
         setLoading(true);
         try {
+            // Сначала обновляем профиль гостя
             const { error: profileError } = await supabase
                 .from('guests')
                 .upsert({ id: user.id, email: email.trim(), full_name: fullName.trim(), phone: phone.trim() });
             
             if (profileError) throw profileError;
 
-            const { error: bookingError } = await supabase
-                .from('bookings')
-                .insert({
-                    guest_id: user.id,
-                    room_id: roomId as string,
-                    check_in: new Date(checkIn as string).toISOString(),
-                    check_out: new Date(checkOut as string).toISOString(),
-                    guests_count: parseInt(guests as string),
-                    total_amount: parseFloat(totalPrice as string),
-                    status: 'confirmed',
-                    source: 'guest_app'
-                });
-            
-            if (bookingError) throw bookingError;
+            // Подготавливаем данные для бронирования через Channex
+            const bookingData = {
+                guest_id: user.id,
+                room_id: roomId as string,
+                room_number: roomName as string, // Передаем полное название комнаты
+                check_in: new Date(checkIn as string).toISOString(),
+                check_out: new Date(checkOut as string).toISOString(),
+                guests_count: parseInt(guests as string),
+                total_amount: parseFloat(totalPrice as string),
+                total_price: parseFloat(totalPrice as string), // Дублируем для совместимости
+                status: 'confirmed',
+                source: 'guest_app',
+                // Данные гостя для Channex
+                guest_name: fullName.trim(),
+                guest_email: email.trim(),
+                guest_phone: phone.trim()
+            };
 
-            setSuccessModalVisible(true); // Показываем наше кастомное окно
+            console.log('Booking data for Channex:', bookingData);
+
+            // Создаем бронирование через Channex API
+            const result = await ChannexBookingService.createBooking(bookingData);
+            
+            if (result.success) {
+                console.log('Booking created successfully:', result.booking);
+                
+                if (result.warning) {
+                    console.warn('Warning:', result.warning);
+                    // Можно показать предупреждение пользователю, но бронирование создано
+                }
+                
+                setSuccessModalVisible(true); // Показываем наше кастомное окно
+            } else {
+                throw new Error('Failed to create booking');
+            }
             
         } catch (error) {
             console.error('Error creating booking:', error);
-            Alert.alert('Error', `Failed to create booking: ${error.message}`);
+            
+            // Проверяем тип ошибки и показываем соответствующее сообщение
+            if (error.message?.includes('unavailable')) {
+                Alert.alert(
+                    'Service Temporarily Unavailable', 
+                    'The booking service is currently unavailable. Please try again in a few minutes.',
+                    [{ text: 'OK' }]
+                );
+            } else if (error.message?.includes('Booking failed:')) {
+                Alert.alert('Booking Failed', error.message, [{ text: 'OK' }]);
+            } else {
+                Alert.alert(
+                    'Error', 
+                    `Failed to create booking: ${error.message || 'Unknown error'}`,
+                    [{ text: 'OK' }]
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -73,8 +111,8 @@ export default function BookingConfirmationScreen() {
     return (
         <>
             <Stack.Screen options={{ title: 'Confirm Booking', headerBackTitle: 'Back' }} />
-            <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+            <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
                     
                     {imageUrl && (
                         <Image source={{ uri: imageUrl as string }} style={styles.roomImage} />
@@ -85,11 +123,11 @@ export default function BookingConfirmationScreen() {
                         <View style={styles.roomInfo}>
                             <Text style={styles.roomName}>{roomName}</Text>
                             <View style={styles.detailItem}>
-                                <Calendar size={16} color="#8a94a6" />
+                                <Ionicons name="calendar" size={16} color="#8a94a6"  />
                                 <Text style={styles.detailText}>{formatDate(checkIn as string)} - {formatDate(checkOut as string)}</Text>
                             </View>
                             <View style={styles.detailItem}>
-                                <Users size={16} color="#8a94a6" />
+                                <Ionicons name="person" size={16} color="#8a94a6" />
                                 <Text style={styles.detailText}>{guests} {parseInt(guests as string) === 1 ? 'Guest' : 'Guests'}</Text>
                             </View>
                         </View>
@@ -102,16 +140,17 @@ export default function BookingConfirmationScreen() {
                     
                     <View style={styles.formContainer}>
                         <Text style={styles.sectionTitle}>Guest Information</Text>
-                        <View style={styles.inputContainer}><Text style={styles.label}>Full Name *</Text><View style={styles.inputWrapper}><User size={20} color="#8a94a6" /><TextInput style={styles.input} placeholder="Enter your full name" value={fullName} onChangeText={setFullName} /></View></View>
-                        <View style={styles.inputContainer}><Text style={styles.label}>Phone Number *</Text><View style={styles.inputWrapper}><Phone size={20} color="#8a94a6" /><TextInput style={styles.input} placeholder="Enter your phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" /></View></View>
-                        <View style={styles.inputContainer}><Text style={styles.label}>Email Address *</Text><View style={styles.inputWrapper}><Mail size={20} color="#8a94a6" /><TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter your email" keyboardType="email-address" autoCapitalize="none" editable={!loading} /></View></View>
+                        <View style={styles.inputContainer}><Text style={styles.label}>Full Name *</Text><View style={styles.inputWrapper}><Ionicons name="person" size={20} color="#8a94a6" /><TextInput style={styles.input} placeholder="Enter your full name" value={fullName} onChangeText={setFullName} /></View></View>
+                        <View style={styles.inputContainer}><Text style={styles.label}>Phone Number *</Text><View style={styles.inputWrapper}><Ionicons name="call" size={20} color="#8a94a6" /><TextInput style={styles.input} placeholder="Enter your phone number" value={phone} onChangeText={setPhone} keyboardType="phone-pad" /></View></View>
+                        <View style={styles.inputContainer}><Text style={styles.label}>Email Address *</Text><View style={styles.inputWrapper}><Ionicons name="mail" size={20} color="#8a94a6" /><TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Enter your email" keyboardType="email-address" autoCapitalize="none" editable={!loading} /></View></View>
+                    </View>
+                    
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmBooking} disabled={loading}>
+                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmButtonText}>Confirm Booking</Text>}
+                        </TouchableOpacity>
                     </View>
                 </ScrollView>
-                <View style={styles.buttonContainer}>
-                    <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmBooking} disabled={loading}>
-                        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmButtonText}>Confirm Booking</Text>}
-                    </TouchableOpacity>
-                </View>
             </KeyboardAvoidingView>
             
             <CustomAlert
@@ -162,7 +201,23 @@ const styles = StyleSheet.create({
     label: { fontSize: 14, fontWeight: '500', color: '#1a2b47', marginBottom: 8 },
     inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f7f9fc', borderRadius: 12, borderWidth: 1, borderColor: '#e1e5eb', height: 55, paddingHorizontal: 15 },
     input: { flex: 1, marginLeft: 10, fontSize: 16 },
-    buttonContainer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e1e5eb' },
-    confirmButton: { backgroundColor: '#1a2b47', height: 55, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    buttonContainer: { 
+        padding: 20, 
+        backgroundColor: '#fff', 
+        marginTop: 10,
+        marginBottom: 10,
+    },
+    confirmButton: { 
+        backgroundColor: '#1a2b47', 
+        height: 55, 
+        borderRadius: 12, 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 3,
+    },
     confirmButtonText: { color: 'white', fontSize: 16, fontWeight: '600' },
 });

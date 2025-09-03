@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, TextInput,
 import { Stack, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { Service } from '@/types';
-import { Search, Filter, Plus } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ServicesScreen() {
   const [services, setServices] = useState<Service[]>([]);
@@ -79,7 +79,7 @@ export default function ServicesScreen() {
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
-            <Search size={20} color="#8a94a6" />
+            <Ionicons name="search" size={20} color="#8a94a6"  />
             <TextInput
               style={styles.searchInput}
               placeholder="Search services..."
@@ -88,7 +88,7 @@ export default function ServicesScreen() {
             />
           </View>
           <TouchableOpacity style={styles.filterButton}>
-            <Filter size={20} color="#1a2b47" />
+            <Ionicons name="filter" size={20} color="#1a2b47"  />
           </TouchableOpacity>
         </View>
         
@@ -123,7 +123,28 @@ export default function ServicesScreen() {
                   filteredServices.map((service) => (
                     <TouchableOpacity key={service.id} style={styles.serviceCard} onPress={() => handleServiceSelect(service)}>
                       <Image 
-                        source={{ uri: service.image_urls?.[0]?.replace('//', '/') || 'https://placehold.co/200x200' }} 
+                        source={{ uri: (() => {
+                          // Use predefined images for services based on name/category
+                          let imageUrl = 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop';
+                          
+                          if (service.name?.toLowerCase().includes('трансфер') || service.name?.toLowerCase().includes('transfer')) {
+                            imageUrl = 'https://images.unsplash.com/photo-1556742111-a301076d9d18?q=80&w=2070&auto=format&fit=crop';
+                          } else if (service.name?.toLowerCase().includes('парков') || service.name?.toLowerCase().includes('parking')) {
+                            imageUrl = 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?q=80&w=2070&auto=format&fit=crop';
+                          } else if (service.name?.toLowerCase().includes('спа') || service.name?.toLowerCase().includes('spa')) {
+                            imageUrl = 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?q=80&w=2070&auto=format&fit=crop';
+                          } else if (service.name?.toLowerCase().includes('ужин') || service.name?.toLowerCase().includes('dinner') || service.name?.toLowerCase().includes('романт')) {
+                            imageUrl = 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2070&auto=format&fit=crop';
+                          } else if (service.name?.toLowerCase().includes('завтрак') || service.name?.toLowerCase().includes('breakfast')) {
+                            imageUrl = 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?q=80&w=2070&auto=format&fit=crop';
+                          } else if (service.name?.toLowerCase().includes('фитнес') || service.name?.toLowerCase().includes('gym')) {
+                            imageUrl = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=2070&auto=format&fit=crop';
+                          } else if (service.name?.toLowerCase().includes('прачеч') || service.name?.toLowerCase().includes('laundry')) {
+                            imageUrl = 'https://images.unsplash.com/photo-1545173168-9b955fa52e02?q=80&w=2070&auto=format&fit=crop';
+                          }
+                          
+                          return imageUrl;
+                        })() }} 
                         style={styles.serviceImage}
                       />
                       <View style={styles.serviceInfo}>
@@ -135,7 +156,7 @@ export default function ServicesScreen() {
                             <Text style={styles.servicePrice}>${service.price}</Text>
                         </View>
                       </View>
-                      <View style={styles.addButton}><Plus size={20} color="#fff" /></View>
+                      <View style={styles.addButton}><Ionicons name="add" size={20} color="#fff"  /></View>
                     </TouchableOpacity>
                   ))
                 ) : (

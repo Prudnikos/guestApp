@@ -3,10 +3,11 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Activi
 import { Stack, router } from 'expo-router';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
-import { AlertTriangle } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ComplaintScreen() {
-  const { user } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -85,7 +86,7 @@ export default function ComplaintScreen() {
       />
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <View style={styles.headerContainer}>
-          <AlertTriangle size={30} color="#ff6b6b" />
+          <Ionicons name="alert-circle" size={30} color="#ff6b6b" />
           <Text style={styles.headerText}>Report a Problem</Text>
         </View>
         

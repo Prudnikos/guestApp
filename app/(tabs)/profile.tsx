@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image, Switch, Alert, ScrollView } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { router } from 'expo-router';
-import { User, Settings, CreditCard, Bell, HelpCircle, LogOut } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const auth = useAuth();
+  const user = auth?.user;
+  const signOut = auth?.signOut;
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailUpdatesEnabled, setEmailUpdatesEnabled] = useState(true);
 
@@ -21,7 +23,9 @@ export default function ProfileScreen() {
         {
           text: "Sign Out",
           onPress: async () => {
-            await signOut();
+            if (signOut) {
+              await signOut();
+            }
           }
         }
       ]
@@ -72,7 +76,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.settingsItemLeft}>
               <View style={[styles.iconContainer, { backgroundColor: '#e3f2fd' }]}>
-                <User size={20} color="#2196f3" />
+                <Ionicons name="person" size={20} color="#2196f3" />
               </View>
               <Text style={styles.settingsItemText}>Personal Information</Text>
             </View>
@@ -85,7 +89,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.settingsItemLeft}>
               <View style={[styles.iconContainer, { backgroundColor: '#e8f5e9' }]}>
-                <CreditCard size={20} color="#4caf50" />
+                <Ionicons name="card" size={20} color="#4caf50" />
               </View>
               <Text style={styles.settingsItemText}>Payment Methods</Text>
             </View>
@@ -95,7 +99,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.settingsItem}>
             <View style={styles.settingsItemLeft}>
               <View style={[styles.iconContainer, { backgroundColor: '#fff3e0' }]}>
-                <Settings size={20} color="#ff9800" />
+                <Ionicons name="settings" size={20} color="#ff9800" />
               </View>
               <Text style={styles.settingsItemText}>Account Settings</Text>
             </View>
@@ -110,7 +114,7 @@ export default function ProfileScreen() {
           <View style={styles.settingsItem}>
             <View style={styles.settingsItemLeft}>
               <View style={[styles.iconContainer, { backgroundColor: '#e1f5fe' }]}>
-                <Bell size={20} color="#03a9f4" />
+                <Ionicons name="notifications" size={20} color="#03a9f4" />
               </View>
               <Text style={styles.settingsItemText}>Push Notifications</Text>
             </View>
@@ -125,7 +129,7 @@ export default function ProfileScreen() {
           <View style={styles.settingsItem}>
             <View style={styles.settingsItemLeft}>
               <View style={[styles.iconContainer, { backgroundColor: '#e1f5fe' }]}>
-                <Bell size={20} color="#03a9f4" />
+                <Ionicons name="notifications" size={20} color="#03a9f4" />
               </View>
               <Text style={styles.settingsItemText}>Email Updates</Text>
             </View>
@@ -148,7 +152,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.settingsItemLeft}>
               <View style={[styles.iconContainer, { backgroundColor: '#f3e5f5' }]}>
-                <HelpCircle size={20} color="#9c27b0" />
+                <Ionicons name="help-circle-outline" size={20} color="#9c27b0" />
               </View>
               <Text style={styles.settingsItemText}>Help Center</Text>
             </View>
@@ -158,7 +162,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.settingsItem}>
             <View style={styles.settingsItemLeft}>
               <View style={[styles.iconContainer, { backgroundColor: '#f3e5f5' }]}>
-                <HelpCircle size={20} color="#9c27b0" />
+                <Ionicons name="help-circle-outline" size={20} color="#9c27b0" />
               </View>
               <Text style={styles.settingsItemText}>Terms & Privacy</Text>
             </View>
@@ -171,7 +175,7 @@ export default function ProfileScreen() {
           style={styles.signOutButton}
           onPress={handleSignOut}
         >
-          <LogOut size={20} color="#fff" />
+          <Ionicons name="log-out-outline" size={20} color="#fff" />
           <Text style={styles.signOutButtonText}>Sign Out</Text>
         </TouchableOpacity>
         

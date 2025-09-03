@@ -1,7 +1,7 @@
 // components/CustomAlert.tsx
 import React from 'react';
 import { Modal, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import { CheckCircle } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ButtonProps {
   text: string;
@@ -25,7 +25,7 @@ export default function CustomAlert({ visible, title, message, buttons }: Custom
     >
       <View style={styles.centeredView}>
         <View style={styles.modalView}>
-          <CheckCircle size={48} color="#22c55e" style={{ marginBottom: 15 }} />
+          <Ionicons name="checkmark-circle" size={48} color="#22c55e" style={{ marginBottom: 15 }} />
           <Text style={styles.modalTitle}>{title}</Text>
           <Text style={styles.modalText}>{message}</Text>
 

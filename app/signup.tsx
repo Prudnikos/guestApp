@@ -9,7 +9,9 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const { signUp, loading } = useAuth();
+  const auth = useAuth();
+  const signUp = auth?.signUp;
+  const loading = auth?.loading;
 
   const handleSignup = async () => {
     if (!email || !password || !confirmPassword) {
@@ -27,6 +29,11 @@ export default function SignupScreen() {
       return;
     }
 
+    if (!signUp) {
+      setError('Authentication not available');
+      return;
+    }
+    
     const { error: signUpError } = await signUp(email, password);
     
     if (signUpError) {
