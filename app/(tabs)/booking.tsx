@@ -247,9 +247,15 @@ export default function BookingScreen() {
           />
           <View style={styles.roomDetails}>
             <View style={styles.roomTitleContainer}>
-              <Text style={styles.roomName}>{room.room_number || 'Room'}</Text>
+              <Text style={styles.roomName}>
+                {room.room_type === 'suite' || room.room_number === '301' || room.room_number === '302' 
+                  ? 'Suite' 
+                  : (room.room_number || 'Room')}
+              </Text>
               {room.room_type && (
-                <Text style={styles.roomType}>{room.room_type}</Text>
+                <Text style={styles.roomType}>
+                  {room.room_type === 'suite' ? 'Deluxe Suite' : room.room_type}
+                </Text>
               )}
             </View>
             <View style={styles.roomInfo}>
