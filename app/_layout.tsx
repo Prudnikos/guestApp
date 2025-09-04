@@ -6,8 +6,9 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import PushNotificationService from "@/services/pushNotifications";
-import * as Notifications from "expo-notifications";
+
+// Используем mock версию для Expo Go
+import PushNotificationService from "@/services/pushNotificationsMock";
 
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -72,32 +73,8 @@ function AppContent() {
         }
       );
 
-      // Обработка уведомлений, когда приложение открыто
-      const notificationListener = Notifications.addNotificationReceivedListener(
-        PushNotificationService.handleIncomingNotification
-      );
-
-      // Обработка нажатий на уведомления
-      const responseListener = Notifications.addNotificationResponseReceivedListener(
-        async response => {
-          const data = response.notification.request.content.data;
-          
-          // Переход в соответствующий раздел в зависимости от типа уведомления
-          switch (data?.type) {
-            case 'new_message':
-              router.push('/chat');
-              break;
-            case 'booking_confirmed':
-              router.push('/(tabs)/booking');
-              break;
-            case 'service_confirmed':
-              router.push('/(tabs)/booking');
-              break;
-            default:
-              break;
-          }
-        }
-      );
+      // Mock notifications are handled internally by pushNotificationsMock
+      console.log('📵 Using mock notifications in Expo Go - app will work with Alert-based notifications');
 
       // Проверяем, было ли приложение открыто через уведомление
       PushNotificationService.getLastNotificationResponse().then(data => {
@@ -108,8 +85,6 @@ function AppContent() {
 
       return () => {
         unsubscribe();
-        Notifications.removeNotificationSubscription(notificationListener);
-        Notifications.removeNotificationSubscription(responseListener);
       };
     }
   }, [user?.id]);

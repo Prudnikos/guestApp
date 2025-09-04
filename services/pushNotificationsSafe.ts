@@ -1,91 +1,97 @@
 // Безопасная обертка для push-уведомлений
-// Работает как в Expo Go, так и в dev builds
+// Автоматически определяет окружение и отключает push в Expo Go
 
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 
-// Проверяем, доступны ли push-уведомления
-const isPushAvailable = () => {
-  // Push работают только на реальных устройствах
-  if (!Device.isDevice) {
-    return false;
-  }
-  
-  // В Expo Go с SDK 51+ push не работают
-  const isExpoGo = Constants.appOwnership === 'expo';
-  if (isExpoGo && Platform.OS === 'android') {
-    console.log('⚠️ Push notifications disabled in Expo Go. Use development build for full functionality.');
-    return false;
-  }
-  
-  return true;
-};
+// Проверяем, работаем ли мы в Expo Go
+const isExpoGo = Constants.appOwnership === 'expo' || !Constants.executionEnvironment?.startsWith('standalone');
 
 class SafePushNotificationService {
+  
+  static async registerForPushNotifications() {
+    if (isExpoGo) {
+      console.log('📵 Push notifications disabled in Expo Go. Using fallback.');
+      return null;
+    }
+    
+    // Если это dev build, используем настоящие push
+    const { PushNotificationService } = await import('./pushNotifications');
+    return PushNotificationService.registerForPushNotifications();
+  }
+  
   static async saveGuestPushToken(guestId: string) {
-    if (!isPushAvailable()) {
-      console.log('📵 Push notifications not available in current environment');
+    if (isExpoGo) {
+      console.log('📵 Mock token saved for testing in Expo Go');
       return;
     }
     
-    // Динамически импортируем только если доступно
-    try {
-      const { PushNotificationService } = await import('./pushNotifications');
-      await PushNotificationService.saveGuestPushToken(guestId);
-    } catch (error) {
-      console.log('Push notifications module not available:', error);
-    }
+    const { PushNotificationService } = await import('./pushNotifications');
+    return PushNotificationService.saveGuestPushToken(guestId);
   }
-
+  
   static subscribeToMessages(guestId: string, onMessage: (message: any) => void) {
-    if (!isPushAvailable()) {
-      console.log('📵 Using fallback messaging without push notifications');
-      // Можно добавить альтернативный механизм через polling
+    if (isExpoGo) {
+      console.log('📵 Using polling for messages in Expo Go');
+      // Можно добавить polling для получения сообщений
       return () => {}; // Возвращаем пустую функцию отписки
     }
     
-    // Если push доступны, используем полную версию
     return import('./pushNotifications').then(({ PushNotificationService }) => {
       return PushNotificationService.subscribeToMessages(guestId, onMessage);
-    }).catch(() => {
-      return () => {};
     });
   }
-
+  
   static async handleIncomingNotification(notification: any) {
-    if (!isPushAvailable()) return;
+    if (isExpoGo) return;
     
-    try {
-      const { PushNotificationService } = await import('./pushNotifications');
-      await PushNotificationService.handleIncomingNotification(notification);
-    } catch (error) {
-      console.log('Cannot handle notification:', error);
-    }
+    const { PushNotificationService } = await import('./pushNotifications');
+    return PushNotificationService.handleIncomingNotification(notification);
   }
-
-  static async handleNotificationResponse(response: any) {
-    if (!isPushAvailable()) return;
-    
-    try {
-      const { PushNotificationService } = await import('./pushNotifications');
-      await PushNotificationService.handleNotificationResponse(response);
-    } catch (error) {
-      console.log('Cannot handle notification response:', error);
-    }
-  }
-
+  
   static async getLastNotificationResponse() {
-    if (!isPushAvailable()) return null;
+    if (isExpoGo) return null;
     
-    try {
-      const { PushNotificationService } = await import('./pushNotifications');
-      return await PushNotificationService.getLastNotificationResponse();
-    } catch (error) {
-      console.log('Cannot get last notification:', error);
-      return null;
+    const { PushNotificationService } = await import('./pushNotifications');
+    return PushNotificationService.getLastNotificationResponse();
+  }
+  
+  static async clearAllNotifications() {
+    if (isExpoGo) return;
+    
+    const { PushNotificationService } = await import('./pushNotifications');
+    return PushNotificationService.clearAllNotifications();
+  }
+  
+  static async setBadgeCount(count: number) {
+    if (isExpoGo) return;
+    
+    const { PushNotificationService } = await import('./pushNotifications');
+    return PushNotificationService.setBadgeCount(count);
+  }
+  
+  static async scheduleCheckInReminder(checkInDate: Date, roomNumber: string) {
+    if (isExpoGo) {
+      console.log('📵 Check-in reminder scheduled (mock)');
+      return;
     }
+    
+    const { PushNotificationService } = await import('./pushNotifications');
+    return PushNotificationService.scheduleCheckInReminder(checkInDate, roomNumber);
   }
 }
 
+// Экспортируем интерфейсы для совместимости
+export enum NotificationType {
+  BOOKING_CONFIRMED = 'booking_confirmed',
+  CHECK_IN_REMINDER = 'check_in_reminder', 
+  ROOM_READY = 'room_ready',
+  NEW_MESSAGE = 'new_message',
+  ORDER_READY = 'order_ready',
+  SERVICE_CONFIRMED = 'service_confirmed',
+  COMPLAINT_RESPONSE = 'complaint_response',
+}
+
+export const PushNotificationService = SafePushNotificationService;
 export default SafePushNotificationService;

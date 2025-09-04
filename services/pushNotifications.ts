@@ -1,18 +1,16 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
-// Настройка поведения уведомлений
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Импортируем expo-notifications, но НЕ вызываем setNotificationHandler глобально
+let Notifications: any;
+try {
+  Notifications = require('expo-notifications');
+} catch (error) {
+  console.log('📵 expo-notifications not available');
+}
 
 // Типы уведомлений для гостей
 export enum NotificationType {
@@ -28,6 +26,26 @@ export enum NotificationType {
 export class PushNotificationService {
   private static realtimeChannel: RealtimeChannel | null = null;
   private static notificationCache = new Map<string, number>();
+  private static notificationHandlerSet = false;
+
+  // Инициализация обработчика уведомлений (вызывается только при необходимости)
+  private static initializeNotificationHandler() {
+    if (!this.notificationHandlerSet && Notifications && Notifications.setNotificationHandler) {
+      try {
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+          }),
+        });
+        this.notificationHandlerSet = true;
+      } catch (error) {
+        console.log('Cannot set notification handler:', error);
+      }
+    }
+  }
+
   // Регистрация устройства для получения уведомлений
   static async registerForPushNotifications() {
     let token;
@@ -37,19 +55,34 @@ export class PushNotificationService {
       return;
     }
 
+    if (!Notifications) {
+      console.log('📵 Notifications module not available');
+      return;
+    }
+
+    // Инициализируем обработчик только когда нужно
+    this.initializeNotificationHandler();
+
     // Запрашиваем разрешения
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    console.log('📱 Current permission status:', existingStatus);
+    
     let finalStatus = existingStatus;
     
     if (existingStatus !== 'granted') {
+      console.log('🔔 Requesting push notification permissions...');
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
+      console.log('📱 New permission status:', finalStatus);
     }
     
     if (finalStatus !== 'granted') {
-      console.log('Не удалось получить разрешение на push уведомления');
+      console.log('❌ Push notifications permission denied by user');
+      alert('Для получения уведомлений о сообщениях и бронированиях, пожалуйста, разрешите уведомления в настройках.');
       return;
     }
+    
+    console.log('✅ Push notifications permission granted');
 
     // Получаем Expo Push Token
     try {
