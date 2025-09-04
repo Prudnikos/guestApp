@@ -49,10 +49,13 @@ export default function BookingConfirmationScreen() {
             if (profileError) throw profileError;
 
             // Подготавливаем данные для бронирования через Channex
+            // ИСПРАВЛЕНО: Для Suite явно передаем правильный room_number
+            const correctRoomNumber = (roomName === 'Suite' || (roomName as string)?.toLowerCase().includes('suite')) ? 'Suite' : (roomName as string);
+            
             const bookingData = {
                 guest_id: user.id,
                 room_id: roomId as string,
-                room_number: roomName as string, // Передаем полное название комнаты
+                room_number: correctRoomNumber, // Используем исправленный room_number
                 check_in: new Date(checkIn as string).toISOString(),
                 check_out: new Date(checkOut as string).toISOString(),
                 guests_count: parseInt(guests as string),

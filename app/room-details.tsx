@@ -317,7 +317,8 @@ export default function RoomDetailsScreen() {
             checkIn: finalCheckIn.toISOString(), // Передаем исправленные даты
             checkOut: finalCheckOut.toISOString(), // Передаем исправленные даты
             guests: guests || room.capacity,
-            roomName: room.room_number || room.room_type || 'Room',
+            // ИСПРАВЛЕНО: Для Suite всегда передаем "Suite" как room_number
+            roomName: room.room_number === 'Suite' ? 'Suite' : (room.room_number || room.room_type || 'Room'),
             pricePerNight: room.price_per_night,
             totalPrice: calculateTotal() + Math.round(calculateTotal() * 0.1)
         }

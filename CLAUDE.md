@@ -100,3 +100,59 @@ Uses NativeWind (Tailwind CSS) for consistent styling across platforms. Componen
 
 ### Error Handling
 If Metro bundler errors occur, the `fix-metro-error.sh` script provides a complete reset workflow that clears all caches and reinstalls dependencies.
+
+## КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Suite Booking Mapping (4 января 2025)
+
+### Проблема
+Бронирования Suite из GuestApp отправлялись в Channex с неправильным room_type_id, что приводило к:
+- Бронирование попадало в Standard Room вместо Suite (Deluxe suite apartment)
+- Овербукинг в Standard Room
+- В PMS бронирование распределялось в комнату 101 вместо Suite
+
+### Решение
+Файл `services/ChannexBookingService.js` был исправлен:
+
+1. **Добавлен маппинг для Suite как строки:**
+```javascript
+this.ROOM_TYPE_MAP = {
+  // Standard rooms
+  '101': '8df610ce-cabb-429d-98d0-90c33f451d97',
+  '102': '8df610ce-cabb-429d-98d0-90c33f451d97',
+  '103': '8df610ce-cabb-429d-98d0-90c33f451d97',
+  
+  // Deluxe rooms  
+  '201': '734d5d86-1fe6-44d8-b6c5-4ac9349c4410',
+  '202': '734d5d86-1fe6-44d8-b6c5-4ac9349c4410',
+  '203': '734d5d86-1fe6-44d8-b6c5-4ac9349c4410',
+  
+  // Suites
+  '301': 'e243d5aa-eff3-43a7-8bf8-87352b62fdc3',
+  '302': 'e243d5aa-eff3-43a7-8bf8-87352b62fdc3',
+  
+  // ВАЖНО: Маппинг для Suite как строки!
+  'Suite': 'e243d5aa-eff3-43a7-8bf8-87352b62fdc3',
+}
+```
+
+2. **Улучшена логика определения типа номера:**
+```javascript
+if (roomNumber === 'Suite' || roomNumber?.toLowerCase().includes('suite')) {
+  roomTypeId = this.ROOM_TYPE_MAP['Suite']; // Правильный ID для Suite
+  roomNumber = 'Suite';
+} else {
+  // Извлекаем номер для других комнат
+  roomNumber = roomNumber?.split(' ')[0] || '101';
+  roomTypeId = this.ROOM_TYPE_MAP[roomNumber] || this.ROOM_TYPE_MAP['101'];
+}
+```
+
+### Корректные Room Type IDs в Channex:
+- **Standard Room**: `8df610ce-cabb-429d-98d0-90c33f451d97`
+- **Deluxe Room**: `734d5d86-1fe6-44d8-b6c5-4ac9349c4410`
+- **Deluxe suite apartment (Suite)**: `e243d5aa-eff3-43a7-8bf8-87352b62fdc3`
+
+### Rate Plan ID для Suite:
+- **Suite Rate**: `45195f3e-fb59-4ddf-9e29-b667dbe2ab58`
+
+### Известная проблема для исправления:
+- В экране "My Bookings" Suite отображается как "101" вместо "Suite"

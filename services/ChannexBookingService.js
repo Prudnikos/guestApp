@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase.ts';
 
 class ChannexBookingService {
   constructor() {
@@ -24,6 +24,9 @@ class ChannexBookingService {
       '301': 'e243d5aa-eff3-43a7-8bf8-87352b62fdc3', // Suite ID из PMSweb
       '302': 'e243d5aa-eff3-43a7-8bf8-87352b62fdc3', // Suite
       
+      // ВАЖНО: Добавляем маппинг для Suite как строки!
+      'Suite': 'e243d5aa-eff3-43a7-8bf8-87352b62fdc3', // Suite по имени
+      
       // Fallback на suite как в PMSweb
       'default': 'e243d5aa-eff3-43a7-8bf8-87352b62fdc3'
     };
@@ -47,10 +50,22 @@ class ChannexBookingService {
       // }
       
       // Извлекаем номер комнаты из room_number (например, "101" из "101 Standard Room" или просто "102")
-      const roomNumber = bookingData.room_number?.toString().split(' ')[0] || '101';
-      console.log('Room number extracted:', roomNumber);
+      // ВАЖНО: Для Suite проверяем сначала полное название
+      let roomNumber = bookingData.room_number?.toString();
+      let roomTypeId;
       
-      const roomTypeId = this.ROOM_TYPE_MAP[roomNumber] || this.ROOM_TYPE_MAP['101'];
+      // Проверяем, если это Suite
+      if (roomNumber === 'Suite' || roomNumber?.toLowerCase().includes('suite')) {
+        console.log('Detected Suite booking, using Suite room type ID');
+        roomTypeId = this.ROOM_TYPE_MAP['Suite']; // Используем правильный ID для Suite
+        roomNumber = 'Suite';
+      } else {
+        // Для других комнат извлекаем номер
+        roomNumber = roomNumber?.split(' ')[0] || '101';
+        roomTypeId = this.ROOM_TYPE_MAP[roomNumber] || this.ROOM_TYPE_MAP['101'];
+      }
+      
+      console.log('Room number extracted:', roomNumber);
       console.log('Room type ID for room', roomNumber, ':', roomTypeId);
       console.log('Rate plan ID:', this.RATE_PLAN_ID);
       
