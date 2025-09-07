@@ -9,12 +9,15 @@ export class MessageNotificationService {
     conversationId: string
   ) {
     try {
-      // Получаем токены менеджеров и сотрудников reception
-      const { data: staffTokens } = await supabase
+      // Получаем токены менеджеров
+      // PMS токены сохраняются без user_type или с user_type != 'guest'
+      console.log('Fetching staff tokens for guest:', guestId);
+      const { data: staffTokens, error } = await supabase
         .from('push_tokens')
-        .select('token')
-        .eq('user_type', 'staff')
-        .or('department.eq.management,department.eq.reception');
+        .select('token, user_id, user_type')
+        .or('user_type.is.null,user_type.neq.guest'); // Токены без user_type или не гостевые
+
+      console.log('Staff tokens query result:', { staffTokens, error });
 
       if (!staffTokens || staffTokens.length === 0) {
         console.log('No staff tokens found for notifications');
@@ -23,6 +26,7 @@ export class MessageNotificationService {
 
       // Убираем дубликаты токенов
       const uniqueTokens = [...new Set(staffTokens.map(t => t.token))];
+      console.log('Unique staff tokens to notify:', uniqueTokens);
       
       // Формируем уведомление
       const title = `💬 Новое сообщение от ${guestName}`;
@@ -71,12 +75,14 @@ export class MessageNotificationService {
     conversationId: string
   ) {
     try {
-      // Получаем токены гостя
-      const { data: guestTokens } = await supabase
+      // Получаем токены гостя только по user_id
+      console.log('Fetching guest tokens for user:', guestId);
+      const { data: guestTokens, error } = await supabase
         .from('push_tokens')
         .select('token')
-        .eq('user_id', guestId)
-        .eq('user_type', 'guest');
+        .eq('user_id', guestId); // Токены конкретного гостя
+
+      console.log('Guest tokens query result:', { guestTokens, error });
 
       if (!guestTokens || guestTokens.length === 0) {
         console.log('No guest tokens found for notifications');
