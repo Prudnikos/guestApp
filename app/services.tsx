@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { Service } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ServicesScreen() {
+  const { bookingId } = useLocalSearchParams();
   const [services, setServices] = useState<Service[]>([]);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,7 +69,10 @@ export default function ServicesScreen() {
   const handleServiceSelect = (service: Service) => {
     router.push({
       pathname: '/service-details',
-      params: { id: service.id }
+      params: { 
+        id: service.id,
+        bookingId: bookingId || undefined
+      }
     });
   };
 

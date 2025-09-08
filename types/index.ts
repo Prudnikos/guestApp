@@ -53,13 +53,28 @@ export interface BookingService {
   service?: Service;
 }
 
+export interface MessageAttachment {
+  id: string;
+  type: 'image' | 'video' | 'document';
+  url: string;
+  filename: string;
+  size: number;
+  mimeType?: string;
+}
+
 export interface Message {
   id: number;
-  guest_id: string;
-  staff_id: string | null;
+  conversation_id?: string;
+  sender_id: string;
+  sender_type: 'guest' | 'staff';
   content: string;
+  attachments?: MessageAttachment[];
   created_at: string;
-  is_from_guest: boolean;
+  is_read?: boolean;
+  // Legacy fields for backward compatibility
+  guest_id?: string;
+  staff_id?: string | null;
+  is_from_guest?: boolean;
 }
 
 export interface Complaint {

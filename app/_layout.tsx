@@ -9,7 +9,17 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // Используем реальные push уведомления
 import PushNotificationService from "@/services/pushNotifications";
-import * as Notifications from 'expo-notifications';
+import { Platform } from "react-native";
+
+// Импортируем уведомления только на мобильных устройствах
+let Notifications: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+  } catch (e) {
+    console.log('expo-notifications not available');
+  }
+}
 
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -61,7 +71,7 @@ function AppContent() {
   const { user } = auth;
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && Notifications) {
       console.log('🔔 Setting up push notifications for user:', user.id);
       
       // Настраиваем обработчик входящих уведомлений
@@ -104,13 +114,17 @@ function AppContent() {
         } else if (data?.type === 'booking_confirmed') {
           router.push('/(tabs)/booking');
         }
+      }).catch(() => {
+        // Игнорируем ошибки если уведомления недоступны
       });
 
       return () => {
-        notificationListener.remove();
-        responseListener.remove();
-        unsubscribe();
+        if (notificationListener) notificationListener.remove();
+        if (responseListener) responseListener.remove();
+        if (unsubscribe) unsubscribe();
       };
+    } else if (user?.id) {
+      console.log('📱 Push notifications not available on this platform');
     }
   }, [user?.id]);
 

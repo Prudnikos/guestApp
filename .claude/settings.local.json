@@ -61,7 +61,17 @@
       "Bash(node:*)",
       "Bash(.fix-metro-error.sh)",
       "Bash(bun pm cache:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Read(//c/PMSApp/**)",
+      "Bash(./fix-metro-error.sh)",
+      "Bash(bun remove:*)",
+      "Bash(EXPO_NO_FLIPPER=1 npx expo start --clear --port 8086)",
+      "Bash(npx @react-native-community/cli start:*)",
+      "Bash(npm start:*)"
     ],
     "deny": [],
     "ask": []

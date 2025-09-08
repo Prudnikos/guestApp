@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import CustomAlert from '@/components/CustomAlert';
 
 export default function ServiceDetailsScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, bookingId, bookingServiceId, editMode, currentQuantity } = useLocalSearchParams();
   const auth = useAuth();
   const user = auth?.user;
   const [service, setService] = useState<Service | null>(null);
@@ -16,6 +16,7 @@ export default function ServiceDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [addingToBooking, setAddingToBooking] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const isEditMode = editMode === 'true';
 
   useEffect(() => {
     const fetchService = async () => {
@@ -54,7 +55,12 @@ export default function ServiceDetailsScreen() {
     };
 
     fetchService();
-}, [id]);
+    
+    // Set initial quantity if in edit mode
+    if (currentQuantity) {
+      setQuantity(parseInt(currentQuantity as string));
+    }
+}, [id, currentQuantity]);
 
   if (loading) {
     return (
@@ -108,55 +114,85 @@ export default function ServiceDetailsScreen() {
     setAddingToBooking(true);
 
     try {
-      console.log('Starting to add service to booking...');
-      
-      // First get the active booking
-      const { data: bookingData, error: bookingError } = await supabase
-        .from('bookings')
-        .select('id')
-        .eq('guest_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (bookingError) {
-        console.error('Error fetching booking:', bookingError);
-        Alert.alert('Error', 'No active booking found. Please book a room first.');
-        return;
+      if (isEditMode && bookingServiceId) {
+        // Update existing booking service
+        console.log('Updating booking service...');
+        
+        const { data, error } = await supabase
+          .from('booking_services')
+          .update({
+            quantity: quantity,
+            price_at_booking: service.price * quantity
+          })
+          .eq('id', bookingServiceId)
+          .select();
+        
+        if (error) {
+          console.error('Error updating service:', error);
+          Alert.alert('Error', `Failed to update service: ${error.message}`);
+          return;
+        }
+        
+        console.log('Service updated successfully:', data);
+        Alert.alert('Success', 'Service updated successfully!');
+        
+        // Navigate back to booking page
+        router.replace({
+          pathname: '/(tabs)/booking',
+          params: { selectedBookingId: bookingId }
+        });
+      } else {
+        // Add new service to booking
+        console.log('Starting to add service to booking...');
+        
+        // First get the active booking
+        const { data: bookingData, error: bookingError } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('guest_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (bookingError) {
+          console.error('Error fetching booking:', bookingError);
+          Alert.alert('Error', 'No active booking found. Please book a room first.');
+          return;
+        }
+        
+        console.log('Found booking:', bookingData);
+        
+        // FIXED: Use correct column name 'price_at_booking' instead of 'price'
+        const serviceBookingData = {
+          booking_id: bookingData.id,
+          service_id: service.id,
+          quantity: quantity,
+          price_at_booking: service.price * quantity, // FIXED: Correct column name
+          status: 'pending'
+        };
+        
+        console.log('Inserting service booking data:', serviceBookingData);
+        
+        // Then add the service to the booking
+        const { data, error } = await supabase
+          .from('booking_services')
+          .insert(serviceBookingData)
+          .select();
+        
+        if (error) {
+          console.error('Error adding service to booking:', error);
+          Alert.alert('Error', `Failed to add service: ${error.message}`);
+          return;
+        }
+        
+        console.log('Service added successfully:', data);
+        
+        // Show success modal
+        setShowSuccessModal(true);
       }
-      
-      console.log('Found booking:', bookingData);
-      
-      // FIXED: Use correct column name 'price_at_booking' instead of 'price'
-      const serviceBookingData = {
-        booking_id: bookingData.id,
-        service_id: service.id,
-        quantity: quantity,
-        price_at_booking: service.price * quantity, // FIXED: Correct column name
-        status: 'pending'
-      };
-      
-      console.log('Inserting service booking data:', serviceBookingData);
-      
-      // Then add the service to the booking
-      const { data, error } = await supabase
-        .from('booking_services')
-        .insert(serviceBookingData)
-        .select();
-      
-      if (error) {
-        console.error('Error adding service to booking:', error);
-        Alert.alert('Error', `Failed to add service: ${error.message}`);
-        return;
-      }
-      
-      console.log('Service added successfully:', data);
-      
-      // Show success modal
-      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error adding service to booking:', error);
-      Alert.alert('Error', `Failed to add service: ${error instanceof Error ? error.message : 'Please try again.'}`);
+      Alert.alert('Error', `Failed to ${isEditMode ? 'update' : 'add'} service: ${error instanceof Error ? error.message : 'Please try again.'}`);
     } finally {
       setAddingToBooking(false);
     }
@@ -252,12 +288,12 @@ export default function ServiceDetailsScreen() {
               {addingToBooking ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.addButtonText}>Add to Booking</Text>
+                <Text style={styles.addButtonText}>{isEditMode ? 'Update Service' : 'Add to Booking'}</Text>
               )}
             </TouchableOpacity>
             
             <Text style={styles.noteText}>
-              * Service will be added to your current booking
+              * Service will be {isEditMode ? 'updated in' : 'added to'} your current booking
             </Text>
           </View>
         </ScrollView>
@@ -273,7 +309,16 @@ export default function ServiceDetailsScreen() {
             text: 'View Booking',
             onPress: () => {
               setShowSuccessModal(false);
-              router.replace('/(tabs)/booking');
+              if (bookingId) {
+                // Возвращаемся к конкретному букингу
+                router.replace({
+                  pathname: '/(tabs)/booking',
+                  params: { selectedBookingId: bookingId }
+                });
+              } else {
+                // Если нет bookingId, идем к списку букингов
+                router.replace('/(tabs)/booking');
+              }
             },
             style: 'primary'
           },

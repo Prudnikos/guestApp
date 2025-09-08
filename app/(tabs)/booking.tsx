@@ -3,12 +3,13 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, ActivityIn
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { Booking, BookingService, Room, Service } from '@/types';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function BookingScreen() {
   const auth = useAuth();
   const user = auth?.user;
+  const { selectedBookingId } = useLocalSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
@@ -36,10 +37,21 @@ export default function BookingScreen() {
         
         setBookings(bookingsData || []);
         
-        // If we have bookings, select the first one by default
+        // If we have bookings, select the appropriate one
         if (bookingsData && bookingsData.length > 0) {
-          setSelectedBooking(bookingsData[0]);
-          fetchBookingDetails(bookingsData[0]);
+          let bookingToSelect = bookingsData[0]; // Default to first one
+          
+          // If selectedBookingId is provided, try to find that booking
+          if (selectedBookingId) {
+            const specificBooking = bookingsData.find(b => b.id === selectedBookingId);
+            if (specificBooking) {
+              bookingToSelect = specificBooking;
+              setShowBookingsList(false); // Go directly to the specific booking
+            }
+          }
+          
+          setSelectedBooking(bookingToSelect);
+          fetchBookingDetails(bookingToSelect);
         }
       } catch (error) {
         console.error('Error fetching bookings data:', error);
@@ -167,7 +179,7 @@ export default function BookingScreen() {
   };
 
   const handleAddService = () => {
-    router.push('/services');
+    router.push(`/services?bookingId=${selectedBooking?.id}`);
   };
 
   const handleContactSupport = () => {
@@ -176,6 +188,38 @@ export default function BookingScreen() {
 
   const handleReportIssue = () => {
     router.push('/complaint');
+  };
+  
+  const handleDeleteService = async (serviceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('booking_services')
+        .delete()
+        .eq('id', serviceId);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setBookingServices(prev => prev.filter(s => s.id !== serviceId));
+      Alert.alert('Success', 'Service removed successfully');
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      Alert.alert('Error', 'Failed to remove service');
+    }
+  };
+  
+  const handleEditService = (service: BookingService) => {
+    // Navigate to service details page with edit mode
+    router.push({
+      pathname: '/service-details',
+      params: { 
+        id: service.service_id,
+        bookingId: selectedBooking?.id,
+        bookingServiceId: service.id,
+        editMode: 'true',
+        currentQuantity: service.quantity.toString()
+      }
+    });
   };
   
   const handleSelectBooking = (booking: Booking) => {
@@ -458,7 +502,32 @@ export default function BookingScreen() {
                   </View>
                 </View>
               </View>
-              <Text style={styles.servicePrice}>${bookingService.price_at_booking || 0}</Text>
+              <View style={styles.serviceActions}>
+                <Text style={styles.servicePrice}>${bookingService.price_at_booking || 0}</Text>
+                <View style={styles.serviceButtons}>
+                  <TouchableOpacity 
+                    style={styles.serviceActionButton}
+                    onPress={() => handleEditService(bookingService)}
+                  >
+                    <Ionicons name="pencil" size={18} color="#1a2b47" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.serviceActionButton, styles.deleteButton]}
+                    onPress={() => {
+                      Alert.alert(
+                        'Remove Service',
+                        `Are you sure you want to remove ${bookingService.service?.name}?`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Remove', onPress: () => handleDeleteService(bookingService.id), style: 'destructive' }
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="trash" size={18} color="#F44336" />
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           ))
         ) : (
@@ -663,7 +732,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusContainer: {
-    padding: 20,
+    padding: 4, // Уменьшили с 20 до 4 (на 80%)
     backgroundColor: '#f7f9fc',
     borderBottomWidth: 1,
     borderBottomColor: '#e1e5eb',
@@ -672,11 +741,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: 2, // Уменьшили с 5 до 2 (на 60%)
   },
   statusTitle: {
-    fontSize: 16, // Уменьшили с 20 до 16 (на 20%)
-    fontWeight: '600', // Сделали чуть менее жирным
+    fontSize: 12, // Уменьшили с 16 до 12 (на 75%)
+    fontWeight: '500', // Менее жирный
     color: '#1a2b47',
   },
   statusBadge: {
@@ -690,7 +759,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   bookingDate: {
-    fontSize: 14,
+    fontSize: 10, // Уменьшили с 14 до 10 (на 28%)
     color: '#8a94a6',
   },
   guestContainer: {
@@ -816,8 +885,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#1a2b47',
-    alignSelf: 'center',
+  },
+  serviceActions: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
     marginLeft: 10,
+  },
+  serviceButtons: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 8,
+  },
+  serviceActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#f0f2f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButton: {
+    backgroundColor: '#ffebee',
   },
   noServicesContainer: {
     alignItems: 'center',
