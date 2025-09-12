@@ -336,6 +336,65 @@ class ChannexBookingService {
       throw error;
     }
   }
+
+  /**
+   * Создание предварительного бронирования (tentative)
+   * Используется для резервирования номера на время оплаты
+   */
+  async createTentativeBooking(bookingData) {
+    try {
+      console.log('Creating tentative booking through Channex API:', bookingData);
+      
+      // Создаем обычное бронирование со статусом tentative
+      const result = await this.createBooking({
+        ...bookingData,
+        status: 'tentative' // Предварительный статус
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Error creating tentative booking:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to create tentative booking'
+      };
+    }
+  }
+
+  /**
+   * Подтверждение бронирования после оплаты
+   */
+  async confirmBooking(bookingId, paymentId) {
+    try {
+      console.log('Confirming booking:', bookingId, 'with payment:', paymentId);
+      
+      // Обновляем статус бронирования в Supabase
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: 'confirmed',
+          payment_id: paymentId,
+          payment_status: 'paid',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bookingId);
+      
+      if (error) throw error;
+      
+      // Здесь можно добавить обновление статуса в Channex API если нужно
+      
+      return {
+        success: true,
+        booking: { id: bookingId, status: 'confirmed' }
+      };
+    } catch (error) {
+      console.error('Error confirming booking:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to confirm booking'
+      };
+    }
+  }
 }
 
 export default new ChannexBookingService();
