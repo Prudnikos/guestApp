@@ -36,10 +36,14 @@ class PaymentService {
    * Создание платежа для бронирования
    */
   async createBookingPayment(booking, options = {}) {
+    const baseUrl = typeof window !== 'undefined' && window.location 
+      ? window.location.origin 
+      : 'https://voda.center';
+    
     const {
-      returnUrl = `${window.location.origin}/payment/success`,
-      cancelUrl = `${window.location.origin}/payment/cancel`,
-      notifyUrl = `${window.location.origin}/api/payhere/webhook`,
+      returnUrl = `${baseUrl}/payment/success`,
+      cancelUrl = `${baseUrl}/payment/cancel`,
+      notifyUrl = `${baseUrl}/api/payhere/webhook`,
       currency = 'USD'
     } = options;
 
@@ -100,6 +104,58 @@ class PaymentService {
   }
 
   /**
+   * Подготовка платежа для PayHere (для мобильного приложения)
+   */
+  async preparePayHerePayment(options = {}) {
+    const {
+      orderId,
+      amount,
+      currency = 'USD',
+      description = 'Hotel Booking',
+      customer = {},
+      bookingId = null
+    } = options;
+
+    try {
+      const baseUrl = 'https://voda.center';
+      
+      // Генерация хеша для безопасности
+      const hash = await this.generatePayHereHash(orderId, amount, currency);
+      
+      // Подготовка данных для PayHere
+      const paymentData = {
+        merchant_id: this.payhere.merchantId,
+        return_url: `${baseUrl}/payment/success`,
+        cancel_url: `${baseUrl}/payment/cancel`,
+        notify_url: `${baseUrl}/api/payhere/webhook`,
+        order_id: orderId,
+        items: description,
+        currency: currency,
+        amount: parseFloat(amount).toFixed(2),
+        first_name: customer.firstName || 'Guest',
+        last_name: customer.lastName || 'User',
+        email: customer.email || 'guest@hotel.com',
+        phone: customer.phone || '+94777123456',
+        address: customer.address || 'Hotel Address',
+        city: customer.city || 'Colombo',
+        country: 'Sri Lanka',
+        hash: hash,
+        custom_1: bookingId || '',
+        custom_2: ''
+      };
+
+      return {
+        paymentUrl: this.payhere.checkoutUrl,
+        paymentData: paymentData
+      };
+
+    } catch (error) {
+      console.error('❌ Error preparing PayHere payment:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Генерация Order ID
    */
   generateOrderId(bookingId) {
@@ -116,20 +172,15 @@ class PaymentService {
     const formattedAmount = parseFloat(amount).toFixed(2);
     const hashString = `${this.payhere.merchantId}${orderId}${formattedAmount}${currency}${merchantSecret}`;
     
-    // Используем crypto-js для корректного MD5
-    if (typeof window !== 'undefined') {
-      // Браузер - используем crypto-js
-      try {
-        const CryptoJS = await import('crypto-js');
-        return CryptoJS.default.MD5(hashString).toString().toUpperCase();
-      } catch (e) {
-        // Fallback на простую реализацию
-        return this.md5Browser(hashString);
-      }
-    } else {
-      // Node.js
-      const crypto = require('crypto');
-      return crypto.createHash('md5').update(hashString).digest('hex').toUpperCase();
+    // Используем crypto-js для всех платформ (браузер, React Native)
+    try {
+      const CryptoJS = await import('crypto-js');
+      const MD5 = CryptoJS.default?.MD5 || CryptoJS.MD5;
+      return MD5(hashString).toString().toUpperCase();
+    } catch (e) {
+      console.error('Error loading crypto-js:', e);
+      // Fallback на простую реализацию
+      return this.md5Browser(hashString);
     }
   }
 
