@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase.ts';
 class ChannexBookingService {
   constructor() {
     this.CHANNEX_API_URL = 'https://staging.channex.io/api/v1';
-    this.CHANNEX_API_KEY = 'uUdBtyJdPAYoP0m0qrEStPh2WJcXCBBBLMngnPxygFWpw0GyDE/nmvN/6wN7gXV+';
+    this.CHANNEX_API_KEY = 'uM3XAAypwi4wBGVibsVRjZKm7vKO0R169NtJ7JvMs85l+7+C4CYOxp6M3Y2Xo9y+';
     this.PROPERTY_ID = '6ae9708a-cbaa-4134-bf04-29314e842709';
 
     // ПРАВИЛЬНЫЕ ID из PMSweb! 

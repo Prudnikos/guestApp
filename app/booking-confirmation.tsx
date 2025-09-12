@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import CustomAlert from '@/components/CustomAlert';
 import ChannexBookingService from '@/services/ChannexBookingService';
-import PaymentButton from '@/components/PaymentButton';
+import PaymentService from '@/services/PaymentService';
+import PayHereWebView from '@/components/PayHereWebView';
 
 export default function BookingConfirmationScreen() {
     const { roomId, checkIn, checkOut, guests, roomName, pricePerNight, totalPrice, imageUrl } = useLocalSearchParams();
@@ -17,6 +18,9 @@ export default function BookingConfirmationScreen() {
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState(user?.email || '');
     const [loading, setLoading] = useState(false);
+    const [showPayment, setShowPayment] = useState(false);
+    const [paymentData, setPaymentData] = useState(null);
+    const [tentativeBookingId, setTentativeBookingId] = useState(null);
 
     const formatDate = (dateString: string) => {
         if (!dateString) return '';
@@ -72,21 +76,39 @@ export default function BookingConfirmationScreen() {
 
             console.log('Booking data for Channex:', bookingData);
 
-            // Создаем бронирование через Channex API
-            const result = await ChannexBookingService.createBooking(bookingData);
+            // ЖЕЛЕЗНОЕ ПРАВИЛО #1: Создаем TENTATIVE бронирование через Channex API
+            const tentativeResult = await ChannexBookingService.createTentativeBooking(bookingData);
             
-            if (result.success) {
-                console.log('Booking created successfully:', result.booking);
-                
-                if (result.warning) {
-                    console.warn('Warning:', result.warning);
-                    // Можно показать предупреждение пользователю, но бронирование создано
-                }
-                
-                setSuccessModalVisible(true); // Показываем наше кастомное окно
-            } else {
-                throw new Error('Failed to create booking');
+            if (!tentativeResult.success) {
+                throw new Error(tentativeResult.error || 'Failed to create tentative booking');
             }
+            
+            console.log('Tentative booking created:', tentativeResult.booking);
+            setTentativeBookingId(tentativeResult.booking.id);
+            
+            // Подготавливаем данные для PayHere
+            const paymentService = new PaymentService();
+            const orderId = `APP-${tentativeResult.booking.id}-${Date.now()}`;
+            const amount = parseFloat(totalPrice as string);
+            
+            const payHereData = await paymentService.preparePayHerePayment({
+                orderId,
+                amount,
+                currency: 'USD',
+                description: `Booking for ${roomName}`,
+                customer: {
+                    firstName: fullName.split(' ')[0],
+                    lastName: fullName.split(' ').slice(1).join(' ') || fullName.split(' ')[0],
+                    email: email.trim(),
+                    phone: phone.trim()
+                },
+                bookingId: tentativeResult.booking.id
+            });
+            
+            // Показываем PayHere WebView для оплаты
+            setPaymentData(payHereData);
+            setShowPayment(true);
+            setLoading(false);
             
         } catch (error) {
             console.error('Error creating booking:', error);
@@ -110,6 +132,49 @@ export default function BookingConfirmationScreen() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Обработка успешной оплаты
+    const handlePaymentSuccess = async (paymentId: string) => {
+        console.log('✅ Payment successful:', paymentId);
+        setShowPayment(false);
+        
+        // Показываем успешное окно
+        setSuccessModalVisible(true);
+        
+        // Обновляем статус бронирования на сервере
+        // Webhook уже должен был это сделать, но можно проверить
+        try {
+            await ChannexBookingService.confirmBooking(tentativeBookingId, paymentId);
+        } catch (error) {
+            console.log('Booking already confirmed by webhook');
+        }
+    };
+    
+    // Обработка отмены оплаты
+    const handlePaymentCancel = () => {
+        console.log('❌ Payment cancelled');
+        setShowPayment(false);
+        setLoading(false);
+        
+        Alert.alert(
+            'Payment Cancelled',
+            'Your booking has been cancelled. The room is still available if you want to try again.',
+            [{ text: 'OK' }]
+        );
+    };
+    
+    // Обработка ошибки оплаты
+    const handlePaymentError = (error: string) => {
+        console.log('❌ Payment error:', error);
+        setShowPayment(false);
+        setLoading(false);
+        
+        Alert.alert(
+            'Payment Failed',
+            error || 'An error occurred during payment. Please try again.',
+            [{ text: 'OK' }]
+        );
     };
 
     return (
@@ -151,7 +216,7 @@ export default function BookingConfirmationScreen() {
                     
                     <View style={styles.buttonContainer}>
                         <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmBooking} disabled={loading}>
-                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmButtonText}>Confirm Booking</Text>}
+                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmButtonText}>Proceed to Payment</Text>}
                         </TouchableOpacity>
                     </View>
                 </ScrollView>
@@ -181,6 +246,17 @@ export default function BookingConfirmationScreen() {
                     }
                 ]}
             />
+            
+            {/* PayHere Payment WebView */}
+            {showPayment && paymentData && (
+                <PayHereWebView
+                    visible={showPayment}
+                    paymentData={paymentData}
+                    onSuccess={handlePaymentSuccess}
+                    onCancel={handlePaymentCancel}
+                    onError={handlePaymentError}
+                />
+            )}
         </>
     );
 }
